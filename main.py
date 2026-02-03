@@ -16,7 +16,7 @@ if api_key:
     system_prompt = "Você é o Auditor Shield, especialista em identificar golpes..." # O prompt que te dei antes vai aqui
     
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-pro",
         system_instruction=system_prompt
     )
 
@@ -31,4 +31,5 @@ if api_key:
         else:
             st.warning("Por favor, cole alguma informação para análise.")
 else:
+
     st.info("Por favor, insira sua API Key na barra lateral para começar.")
