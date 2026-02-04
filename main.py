@@ -1,43 +1,56 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
 
-# 1. Configuração visual do Web App
-st.set_page_config(page_title="Auditor Shield", page_icon="🛡️")
+# 1. Configuração de Estilo (Removemos a barra lateral para ficar mais limpo)
+st.set_page_config(page_title="Auditor Shield", page_icon="🛡️", initial_sidebar_state="collapsed")
+
+# 2. Conexão com a Chave Embutida
+try:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    # Selecionamos o modelo Flash que você ativou no Google Cloud
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except Exception as e:
+    st.error("Erro de configuração nas Secrets. Verifique sua API Key.")
+    st.stop()
+
+# 3. Interface Amigável
 st.title("🛡️ Auditor Shield")
-st.subheader("Análise de Integridade Digital")
+st.markdown("### Analise agora a integridade de qualquer promessa digital")
+st.write("Você pode colar um texto/link ou enviar uma imagem (print) do que achou suspeito.")
 
-# Barra lateral para a chave
-api_key = st.sidebar.text_input("Cole sua API Key aqui:", type="password")
+# Abas para diferentes tipos de entrada
+tab1, tab2 = st.tabs(["📝 Texto ou Link", "📸 Imagem (Print)"])
 
-if api_key:
-    try:
-        # Configura a conexão oficial
-        genai.configure(api_key=api_key)
-        
-        # SOLUÇÃO PARA O ERRO 404: 
-        # Em vez de escrever o nome, perguntamos ao Google quais modelos você pode usar
-        modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Escolhemos o primeiro da lista (que será o gemini-1.5-flash ou gemini-pro)
-        modelo_escolhido = modelos_disponiveis[0]
-        model = genai.GenerativeModel(modelo_escolhido)
+with tab1:
+    user_text = st.text_area("Descreva a situação ou cole o link:", placeholder="Ex: Recebi uma proposta de lucro de 5% ao dia...")
 
-        # 2. Área de trabalho
-        user_input = st.text_area("O que você deseja auditar hoje?", placeholder="Cole links ou textos aqui...")
+with tab2:
+    uploaded_file = st.file_uploader("Envie uma captura de tela (PNG, JPG):", type=["jpg", "png", "jpeg"])
+    if uploaded_file:
+        st.image(uploaded_file, caption="Imagem carregada", use_container_width=True)
 
-        if st.button("Iniciar Auditoria"):
-            if user_input:
-                with st.spinner("O Auditor Shield está processando..."):
-                    # Instrução direta
-                    comando = f"Aja como o Auditor Shield. Analise se o seguinte conteúdo possui indícios de golpe: {user_input}"
-                    response = model.generate_content(comando)
-                    
-                    st.success("Auditoria Concluída!")
-                    st.markdown(response.text)
+# 4. Processamento da Auditoria
+if st.button("🚀 INICIAR AUDITORIA"):
+    with st.spinner("O Auditor Shield está investigando..."):
+        try:
+            prompt = "Aja como o Auditor Shield. Analise se este conteúdo possui indícios de golpe, fraude ou promessa irreal. Seja direto e dê um veredito técnico."
+            
+            if uploaded_file:
+                # O robô 'olha' para a imagem
+                img = Image.open(uploaded_file)
+                response = model.generate_content([prompt, img])
+            elif user_text:
+                response = model.generate_content(f"{prompt} Conteúdo: {user_text}")
             else:
-                st.warning("Por favor, forneça um conteúdo.")
+                st.warning("Por favor, insira um texto ou carregue uma imagem.")
+                st.stop()
                 
-    except Exception as e:
-        st.error(f"Erro detectado: {e}")
-else:
-    st.info("🛡️ Para começar, cole sua API Key na barra lateral esquerda.")
+            st.subheader("📋 Relatório de Auditoria")
+            st.info(response.text)
+            
+        except Exception as e:
+            st.error(f"Ocorreu um erro no processamento: {e}")
+
+st.markdown("---")
+st.caption("Ferramenta desenvolvida para suporte à decisão. Não substitui assessoria jurídica oficial.")
