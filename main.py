@@ -2,15 +2,15 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. Configuração de Estilo AuditIA (Fundo Branco e Cinza Tecnológico)
+# 1. Configuração de Estilo AuditIA (Layout Branco e Cinza Pericial)
 st.set_page_config(page_title="AuditIA", page_icon="👁️", layout="centered")
 
 st.markdown("""
     <style>
-    /* Fundo geral e textos principais */
+    /* Fundo geral e textos nítidos */
     .stApp { background-color: #ffffff; color: #333333; }
     
-    /* Personalização do Botão (Cinza do Logotipo) */
+    /* Botão em Cinza Tecnológico (Extraído do olho da logo) */
     div.stButton > button:first-child {
         background-color: #4a4a4a;
         color: #ffffff;
@@ -22,31 +22,31 @@ st.markdown("""
         transition: 0.3s;
     }
     div.stButton > button:first-child:hover {
-        background-color: #59ea63; /* Verde Néon apenas no hover para destaque */
+        background-color: #59ea63; /* Destaque em Verde Néon no hover */
         color: #000000;
+        box-shadow: 0 4px 15px rgba(89, 234, 99, 0.3);
     }
     
-    /* Caixas de texto e entradas (Fundo cinza claro com bordas nítidas) */
+    /* Campos de Entrada com Fundo Suave */
     .stTextArea textarea { 
-        background-color: #f0f2f6; 
+        background-color: #f8f9fa; 
         color: #333333; 
-        border: 1px solid #4a4a4a; 
+        border: 1px solid #d1d5db; 
     }
     
-    /* Correção de visibilidade do Upload de Arquivos */
-    .stFileUploader label { color: #333333 !important; }
+    /* Área de Upload Visível e Estilizada */
     .stFileUploader section { 
-        background-color: #f0f2f6; 
+        background-color: #f8f9fa; 
         border: 1px dashed #4a4a4a; 
         color: #333333; 
     }
 
-    /* Estilo do Relatório (Veredito) */
+    /* Relatório de Auditoria */
     .stAlert { 
-        background-color: #f9f9f9; 
+        background-color: #ffffff; 
         border-left: 5px solid #59ea63; 
         color: #333333; 
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
     
     /* Títulos em Cinza Escuro */
@@ -54,7 +54,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Conexão com a Chave (Lógica de listagem automática)
+# 2. Conexão Segura e Listagem de Modelos
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -63,16 +63,18 @@ except Exception as e:
     st.error(f"Erro de Conexão: {e}")
     st.stop()
 
-# 3. Cabeçalho com o Logotipo
+# 3. Cabeçalho com a Logo Redimensionada
 try:
-    # O código tentará carregar o arquivo .png que está no seu GitHub
     logo = Image.open("Logo_AI_1.png")
-    st.image(logo, width=400) # Largura fixada em 400px para não ocupar a tela toda
+    # Centralização manual da imagem
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image(logo, width=300) 
 except:
     st.title("👁️ AuditIA")
 
-st.markdown("### Auditoria de Integridade Digital")
-st.write("Analise prints e mensagens suspeitas com precisão técnica.")
+st.markdown("<h3 style='text-align: center;'>Auditoria de Integridade Digital</h3>", unsafe_allow_html=True)
+st.write("<p style='text-align: center;'>Analise prints e mensagens suspeitas com precisão técnica.</p>", unsafe_allow_html=True)
 
 # 4. Interface de Trabalho
 uploaded_file = st.file_uploader("📸 Envie um print do golpe (opcional):", type=["jpg", "png", "jpeg"])
@@ -108,13 +110,13 @@ if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
             except Exception as e:
                 st.error(f"Erro na análise: {e}")
 
-# 5. Rodapé Informativo
+# 5. Dicas Estratégicas
 st.markdown("---")
 with st.expander("💡 Dicas Estratégicas"):
     st.markdown("""
-    * **Prints Nítidos**: Certifique-se de que links e nomes de usuários estejam visíveis na imagem.
-    * **Contexto**: Use o campo de texto para dizer onde você encontrou essa promessa (Ex: WhatsApp, anúncio patrocinado).
-    * **Dúvidas Específicas**: Você pode perguntar: 'Esse CNPJ é real?' ou 'Esse link de pagamento é seguro?'.
+    * **Foco no Detalhe**: Se houver um link no print, peça especificamente para o AuditIA analisá-lo.
+    * **Dados Bancários**: O AuditIA pode identificar se chaves PIX citadas em imagens já foram reportadas como fraudulentas.
+    * **Urgência Falsa**: O robô analisa se o tom da mensagem tenta te forçar a agir rápido, um sinal clássico de golpe.
     """)
 
 st.caption("AuditIA - Tecnologia e Segurança Digital")
