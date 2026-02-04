@@ -1,48 +1,35 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Configuração visual do Web App
-st.set_page_config(page_title="Auditor Shield", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Auditor Shield", page_icon="🛡️")
 
+# Interface lateral
 st.sidebar.header("Configurações")
 api_key = st.sidebar.text_input("Cole sua API Key do Google aqui:", type="password")
 
 st.title("🛡️ Auditor Shield")
-st.subheader("Seu guia contra golpes e promessas falsas")
-st.markdown("---")
+st.subheader("Análise de Integridade Digital")
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
         
-        # Lista de nomes possíveis para o modelo, do mais novo ao mais comum
-        model_options = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
-        
-        system_prompt = "Você é o 'Auditor Shield', especialista em identificar golpes e fakes."
+        # Nome exato que o Google exige para o modelo que você selecionou
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
-        user_input = st.text_area("O que deseja auditar hoje?")
+        user_input = st.text_area("O que deseja analisar?")
 
         if st.button("Iniciar Auditoria"):
             if user_input:
-                with st.spinner("Investigando..."):
-                    success = False
-                    # Tenta cada modelo até um funcionar
-                    for model_name in model_options:
-                        try:
-                            model = genai.GenerativeModel(model_name=model_name, system_instruction=system_prompt)
-                            response = model.generate_content(user_input)
-                            st.success(f"Auditoria Concluída!")
-                            st.markdown(response.text)
-                            success = True
-                            break 
-                        except:
-                            continue
-                    
-                    if not success:
-                        st.error("Não conseguimos conectar com os modelos do Google. Verifique se sua chave está correta no AI Studio.")
+                with st.spinner("Analisando..."):
+                    # Aqui incluímos as instruções direto no comando
+                    prompt_completo = f"Aja como um Auditor especialista em golpes. Analise isto: {user_input}"
+                    response = model.generate_content(prompt_completo)
+                    st.success("Resultado:")
+                    st.write(response.text)
             else:
-                st.warning("Insira um conteúdo para análise.")
+                st.warning("Insira um link ou texto.")
     except Exception as e:
-        st.error(f"Erro inesperado: {e}")
+        st.error(f"Erro técnico: {e}")
 else:
-    st.info("🛡️ Insira sua API Key na lateral para começar.")
+    st.info("Coloque sua API Key na esquerda.")
