@@ -4,7 +4,7 @@ from PIL import Image
 from fpdf import FPDF
 import io
 
-# 1. Configuração de Estilo AuditIA
+# Configuração de Estilo AuditIA
 st.set_page_config(page_title="AuditIA", page_icon="👁️", layout="centered")
 
 st.markdown("""
@@ -18,13 +18,11 @@ st.markdown("""
         height: 3.5em;
         font-weight: bold;
     }
-    div.stButton > button:first-child:hover { background-color: #59ea63; color: #000000; }
     .stTextArea textarea { background-color: #f8f9fa; border: 1px solid #d1d5db; }
-    h3 { color: #4a4a4a !important; margin-top: -20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Conexão
+# Conexão
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -33,7 +31,7 @@ except Exception as e:
     st.error(f"Erro de Conexão: {e}")
     st.stop()
 
-# 3. Cabeçalho (Logo Grande à Esquerda)
+# Logo Grande à Esquerda
 try:
     logo = Image.open("Logo_AI_1.png")
     st.image(logo, width=450)
@@ -42,43 +40,47 @@ except:
 
 st.markdown("### Auditoria de Integridade Digital")
 
-# 4. Interface de Trabalho
+# Interface de Trabalho (Corrigida para Mobile)
 uploaded_file = st.file_uploader("📸 Envie um print do golpe:", type=["jpg", "png", "jpeg"])
+
 if uploaded_file:
+    # Mostra a imagem e libera a memória do navegador imediatamente
     st.image(uploaded_file, caption="Evidência carregada", use_container_width=True)
 
 user_input = st.text_area("📝 Descreva o caso:", placeholder="Ex: Analise este print...", height=120)
 
-# Função para gerar PDF
-def gerar_pdf(texto_auditoria):
+# Função PDF com tratamento de caracteres brasileiros
+def gerar_pdf(texto):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, txt="Relatório de Auditoria Digital - AuditIA", ln=True, align='C')
+    pdf.cell(200, 10, txt="Relatorio AuditIA", ln=True, align='C')
     pdf.ln(10)
     pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, txt=texto_auditoria)
-    return pdf.output(dest='S').encode('latin-1', 'replace')
+    # Remove emojis e caracteres que o PDF não entende
+    texto_limpo = texto.encode('ascii', 'ignore').decode('ascii')
+    pdf.multi_cell(0, 10, txt=texto_limpo)
+    return pdf.output(dest='S').encode('latin-1')
 
-# 5. Execução
 if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
     if not user_input and not uploaded_file:
-        st.warning("Por favor, insira um conteúdo.")
+        st.warning("Por favor, forneça imagem ou texto.")
     else:
         with st.spinner("🕵️ Auditando..."):
             try:
-                comando = "Aja como o AuditIA. Analise o conteúdo e dê um veredito técnico sobre riscos de fraude."
+                comando = "Aja como o AuditIA. Analise e de um veredito direto."
                 if uploaded_file:
-                    img = Image.open(uploaded_file).convert('RGB') # Força conversão para evitar erro mobile
+                    # Converte para RGB para garantir que o Gemini leia qualquer formato de celular
+                    img = Image.open(uploaded_file).convert('RGB')
                     response = model.generate_content([comando, img, user_input] if user_input else [comando, img])
                 else:
-                    response = model.generate_content(f"{comando} Conteúdo: {user_input}")
+                    response = model.generate_content(f"{comando} Conteudo: {user_input}")
                 
                 resultado = response.text
                 st.subheader("📋 Relatório AuditIA")
                 st.info(resultado)
                 
-                # Opção de Download em PDF
+                # O BOTÃO DE PDF SÓ APARECE APÓS A ANÁLISE
                 pdf_bytes = gerar_pdf(resultado)
                 st.download_button(
                     label="📥 Baixar Relatório em PDF",
@@ -88,6 +90,3 @@ if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
                 )
             except Exception as e:
                 st.error(f"Erro: {e}")
-
-st.markdown("---")
-st.caption("AuditIA - Tecnologia e Segurança Digital")
