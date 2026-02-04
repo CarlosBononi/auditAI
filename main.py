@@ -3,8 +3,9 @@ import google.generativeai as genai
 from PIL import Image
 from fpdf import FPDF
 import io
+from datetime import datetime # Importação para pegar a data atual
 
-# 1. Estilo AuditIA (Layout Branco e Cinza Pericial)
+# 1. Estilo AuditIA (Fundo Branco e Cinza Pericial)
 st.set_page_config(page_title="AuditIA", page_icon="👁️", layout="centered")
 
 st.markdown("""
@@ -24,7 +25,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Conexão Segura (Lógica de listagem para evitar erro 404)
+# 2. Conexão Segura
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -42,10 +43,10 @@ except:
 
 st.markdown("### Auditoria de Integridade Digital")
 
-# 4. Upload Habilitado para Imagens e PDF
+# 4. Interface de Trabalho
 uploaded_file = st.file_uploader(
     "📸 Envie um print ou documento PDF:", 
-    type=["jpg", "png", "jpeg", "pdf"] # ADICIONADO PDF AQUI
+    type=["jpg", "png", "jpeg", "pdf"]
 )
 
 if uploaded_file:
@@ -54,35 +55,44 @@ if uploaded_file:
     else:
         st.image(uploaded_file, caption="Evidência carregada", use_container_width=True)
 
-user_input = st.text_area("📝 Descreva o caso:", placeholder="Ex: Analise este contrato/print...", height=120)
+user_input = st.text_area("📝 Descreva o caso:", placeholder="Ex: Analise este documento...", height=120)
 
-# Função para Gerar o PDF de Saída (Relatório)
-def gerar_pdf_saida(texto):
+# Função para Gerar o Relatório PDF de Saída
+def gerar_pdf_saida(texto, data_atual):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="Relatorio de Auditoria - AuditIA", ln=True, align='C')
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt=f"Data da Analise: {data_atual}", ln=True, align='C')
     pdf.ln(10)
     pdf.set_font("Arial", size=12)
-    # Limpeza de caracteres para evitar erro no PDF
     texto_limpo = texto.encode('ascii', 'ignore').decode('ascii')
     pdf.multi_cell(0, 10, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 5. Execução da Auditoria
+# 5. Execução da Auditoria com Data Atualizada
 if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
     if not user_input and not uploaded_file:
         st.warning("Por favor, forneça um arquivo ou texto.")
     else:
-        with st.spinner("🕵️ AuditIA analisando evidências..."):
+        # Pega a data e hora atual do sistema
+        data_agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        with st.spinner("🕵️ AuditIA analisando evidências em tempo real..."):
             try:
-                instrucao = "Aja como o AuditIA. Analise o arquivo (PDF ou Imagem) e o texto fornecido. De um veredito direto sobre riscos de fraude."
+                # O PULO DO GATO: Inserimos a data atual na instrução para a IA
+                instrucao = f"""
+                Aja como o AuditIA, especialista em segurança digital e perito em fraudes.
+                INFORMAÇÃO CRÍTICA DE CONTEXTO: Hoje é dia {data_agora}. 
+                Use esta data para validar prazos, vencimentos de boletos e atualidade das informações enviadas.
+                Analise o arquivo e/ou texto e dê um veredito direto sobre riscos de fraude.
+                """
                 
                 conteudo_para_ia = [instrucao]
                 
                 if uploaded_file:
                     if uploaded_file.type == "application/pdf":
-                        # O Gemini 1.5 Flash processa bytes de PDF diretamente
                         pdf_data = uploaded_file.read()
                         conteudo_para_ia.append({"mime_type": "application/pdf", "data": pdf_data})
                     else:
@@ -98,16 +108,16 @@ if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
                 st.subheader("📋 Relatório AuditIA")
                 st.info(resultado)
                 
-                # Botão para baixar o relatório gerado em PDF
-                pdf_bytes = gerar_pdf_saida(resultado)
+                # Botão para baixar o relatório com a data correta no documento
+                pdf_bytes = gerar_pdf_saida(resultado, data_agora)
                 st.download_button(
                     label="📥 Baixar Veredito em PDF",
                     data=pdf_bytes,
-                    file_name="relatorio_auditIA.pdf",
+                    file_name=f"auditoria_{datetime.now().strftime('%d_%m_%Y')}.pdf",
                     mime="application/pdf"
                 )
             except Exception as e:
                 st.error(f"Erro na análise: {e}")
 
 st.markdown("---")
-st.caption("AuditIA - Tecnologia e Segurança Digital")
+st.caption(f"AuditIA - Atualizado em {datetime.now().strftime('%Y')}")
