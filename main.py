@@ -5,33 +5,34 @@ import google.generativeai as genai
 st.set_page_config(page_title="Auditor Shield", page_icon="🛡️")
 st.title("🛡️ Auditor Shield")
 
-# Configuração na barra lateral
+# Chave que você me passou
 api_key = st.sidebar.text_input("Cole sua API Key aqui:", type="password")
 
 if api_key:
     try:
+        # Configuração da API
         genai.configure(api_key=api_key)
         
-        # Usaremos o 'gemini-pro' que é o modelo mais estável e compatível 
-        # com quase todas as chaves geradas no AI Studio
-        model = genai.GenerativeModel('gemini-pro')
+        # AJUSTE TÉCNICO: Forçamos o uso do modelo 1.5-flash com o nome completo
+        # que o projeto AuditIA exige para conexões externas
+        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
 
         user_input = st.text_area("O que deseja auditar?")
 
         if st.button("Iniciar Auditoria"):
             if user_input:
-                with st.spinner("Analisando..."):
-                    # Colocamos a personalidade do Auditor direto no pedido
-                    comando = f"Aja como o Auditor Shield, um perito em golpes digitais. Analise se isto é fraude ou promessa falsa e dê um veredito: {user_input}"
+                with st.spinner("O Auditor está trabalhando..."):
+                    # Instrução embutida para evitar erro de configuração de sistema
+                    prompt = f"Aja como o Auditor Shield, especialista em identificar golpes. Analise isto e dê um veredito técnico: {user_input}"
                     
-                    response = model.generate_content(comando)
-                    st.success("Resultado da Auditoria:")
+                    response = model.generate_content(prompt)
+                    st.success("Auditoria Concluída!")
                     st.write(response.text)
             else:
-                st.warning("Por favor, cole um texto ou link.")
+                st.warning("Por favor, digite algo.")
                 
     except Exception as e:
-        # Se der erro, ele vai nos dizer exatamente o porquê agora
-        st.error(f"Erro de Conexão: {e}")
+        st.error(f"Erro: {e}")
+        st.info("Se o erro 404 persistir, precisamos liberar o uso da API no Console do Google Cloud.")
 else:
-    st.info("Aguardando API Key na barra lateral...")
+    st.info("🛡️ Aguardando sua chave na barra lateral.")
