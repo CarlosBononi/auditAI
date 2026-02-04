@@ -1,38 +1,39 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Configuração visual
+# 1. Configuração visual e de título
 st.set_page_config(page_title="Auditor Shield", page_icon="🛡️")
 st.title("🛡️ Auditor Shield")
+st.subheader("Análise de Integridade Digital")
 
-# Chave que você me passou
+# 2. Entrada da API Key na barra lateral
 api_key = st.sidebar.text_input("Cole sua API Key aqui:", type="password")
 
 if api_key:
     try:
-        # Configuração da API
+        # Configura a conexão oficial
         genai.configure(api_key=api_key)
         
-        # AJUSTE TÉCNICO: Forçamos o uso do modelo 1.5-flash com o nome completo
-        # que o projeto AuditIA exige para conexões externas
-        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+        # Como a API está ativada, este modelo agora é reconhecido imediatamente
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
-        user_input = st.text_area("O que deseja auditar?")
+        # 3. Área de trabalho do usuário
+        user_input = st.text_area("O que você deseja auditar hoje?", placeholder="Cole links ou textos aqui...")
 
         if st.button("Iniciar Auditoria"):
             if user_input:
-                with st.spinner("O Auditor está trabalhando..."):
-                    # Instrução embutida para evitar erro de configuração de sistema
-                    prompt = f"Aja como o Auditor Shield, especialista em identificar golpes. Analise isto e dê um veredito técnico: {user_input}"
+                with st.spinner("O Auditor Shield está processando os dados..."):
+                    # Instrução direta e eficaz
+                    comando = f"Aja como o Auditor Shield. Analise se o seguinte conteúdo possui indícios de golpe ou fraude: {user_input}"
+                    response = model.generate_content(comando)
                     
-                    response = model.generate_content(prompt)
-                    st.success("Auditoria Concluída!")
-                    st.write(response.text)
+                    st.success("Auditoria Finalizada!")
+                    st.markdown(response.text)
             else:
-                st.warning("Por favor, digite algo.")
+                st.warning("Por favor, forneça um conteúdo para análise.")
                 
     except Exception as e:
-        st.error(f"Erro: {e}")
-        st.info("Se o erro 404 persistir, precisamos liberar o uso da API no Console do Google Cloud.")
+        # Exibe erros de forma clara caso a chave seja colada incorretamente
+        st.error(f"Atenção: {e}")
 else:
-    st.info("🛡️ Aguardando sua chave na barra lateral.")
+    st.info("🛡️ Para começar, cole sua API Key na barra lateral esquerda.")
