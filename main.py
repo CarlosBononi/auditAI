@@ -1,46 +1,48 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. Configuração visual do Web App
+# Configuração visual do Web App
 st.set_page_config(page_title="Auditor Shield", page_icon="🛡️", layout="wide")
 
-# Barra lateral para configurações
 st.sidebar.header("Configurações")
 api_key = st.sidebar.text_input("Cole sua API Key do Google aqui:", type="password")
-st.sidebar.info("Obtenha sua chave em: aistudio.google.com")
 
-# 2. Título e cabeçalho principal
 st.title("🛡️ Auditor Shield")
-st.subheader("Seu guia definitivo contra golpes e promessas falsas")
+st.subheader("Seu guia contra golpes e promessas falsas")
 st.markdown("---")
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
         
-        system_prompt = """Você é o 'Auditor Shield', especialista em análise de integridade digital. 
-        Sua missão é desmascarar golpes e promessas irreais. 
-        Dê um diagnóstico de risco e um Veredito Final."""
+        # Lista de nomes possíveis para o modelo, do mais novo ao mais comum
+        model_options = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+        
+        system_prompt = "Você é o 'Auditor Shield', especialista em identificar golpes e fakes."
 
-        # NOME CORRIGIDO ABAIXO:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest", 
-            system_instruction=system_prompt
-        )
-
-        user_input = st.text_area("O que deseja auditar hoje?", placeholder="Cole o link ou texto aqui...")
+        user_input = st.text_area("O que deseja auditar hoje?")
 
         if st.button("Iniciar Auditoria"):
             if user_input:
                 with st.spinner("Investigando..."):
-                    response = model.generate_content(user_input)
-                    st.success("Auditoria Concluída!")
-                    st.markdown(response.text)
+                    success = False
+                    # Tenta cada modelo até um funcionar
+                    for model_name in model_options:
+                        try:
+                            model = genai.GenerativeModel(model_name=model_name, system_instruction=system_prompt)
+                            response = model.generate_content(user_input)
+                            st.success(f"Auditoria Concluída!")
+                            st.markdown(response.text)
+                            success = True
+                            break 
+                        except:
+                            continue
+                    
+                    if not success:
+                        st.error("Não conseguimos conectar com os modelos do Google. Verifique se sua chave está correta no AI Studio.")
             else:
                 st.warning("Insira um conteúdo para análise.")
-
     except Exception as e:
-        # Se ainda der erro de nome, o robô vai te avisar aqui
-        st.error(f"Erro de conexão: {e}")
+        st.error(f"Erro inesperado: {e}")
 else:
     st.info("🛡️ Insira sua API Key na lateral para começar.")
