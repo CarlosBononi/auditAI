@@ -100,7 +100,7 @@ if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
 
 # 6. Manual Robustecido de Utilização
 st.markdown("---")
-with st.expander("💡 MANUAL DE UTILIZAÇÃO ROBUSTO - Como dominar o AuditIA"):
+with st.expander("💡 MANUAL DE UTILIZAÇÃO - Como dominar o AuditIA"):
     st.markdown("""
     O **AuditIA** é uma inteligência pericial multimodal. Para obter diagnósticos 100% precisos, siga estas diretrizes:
     
@@ -116,3 +116,4 @@ with st.expander("💡 MANUAL DE UTILIZAÇÃO ROBUSTO - Como dominar o AuditIA")
     """)
 
 st.caption(f"AuditIA - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
+
