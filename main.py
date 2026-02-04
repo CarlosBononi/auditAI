@@ -3,21 +3,21 @@ import google.generativeai as genai
 from PIL import Image
 from fpdf import FPDF
 import io
-from datetime import datetime
-import pytz # Para o horário de Brasília exato
+from datetime import datetime, timedelta
 
-# 1. Configuração de Página e Estilo (Branco e Cinza)
+# 1. Configuração de Página e Estilo (Branco e Cinza Pericial)
 st.set_page_config(page_title="AuditIA", page_icon="👁️", layout="centered")
 
 def aplicar_cor_veredito(texto):
     texto_upper = texto.upper()
-    cor, font_cor = "#3498db", "white" # Padrão Azul (Neutro)
-    if any(x in texto_upper for x in ["FRAUDE CONFIRMADA", "GOLPE CONFIRMADO"]): cor = "#ff4b4b"
-    elif any(x in texto_upper for x in ["POSSÍVEL FRAUDE", "PROVÁVEL GOLPE"]): cor = "#ffa500"
-    elif any(x in texto_upper for x in ["ATENÇÃO", "INDICAÇÕES SUSPEITAS"]): cor = "#f1c40f"; font_cor = "black"
-    elif any(x in texto_upper for x in ["SEGURO", "TUDO OK"]): cor = "#2ecc71"
+    # Cores dinâmicas para o Semáforo de Risco
+    if "FRAUDE CONFIRMADA" in texto_upper: cor = "#ff4b4b"      # Vermelho
+    elif "POSSÍVEL FRAUDE" in texto_upper: cor = "#ffa500"     # Laranja
+    elif "ATENÇÃO" in texto_upper: cor = "#f1c40f"             # Amarelo
+    elif "SEGURO" in texto_upper: cor = "#2ecc71"              # Verde
+    else: cor = "#3498db"                                      # Azul (Neutro)
     
-    return f'<div style="background-color: {cor}; padding: 20px; border-radius: 10px; color: {font_cor}; font-weight: bold; border: 1px solid #4a4a4a;">{texto}</div>'
+    return f'<div style="background-color: {cor}; padding: 20px; border-radius: 10px; color: white; font-weight: bold; border: 1px solid #4a4a4a;">{texto}</div>'
 
 st.markdown("""
     <style>
@@ -28,31 +28,31 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Conexão Segura e Listagem de Modelos
+# 2. Conexão Segura (Lógica de listagem para evitar erro 404)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     model = genai.GenerativeModel(modelos[0])
 except Exception as e:
-    st.error(f"Erro de Conexão: {e}"); st.stop()
+    st.error("Erro de conexão com a API."); st.stop()
 
-# 3. Cabeçalho (Logo Grande à Esquerda)
+# 3. Cabeçalho (Logo Grande e à Esquerda)
 try:
     logo = Image.open("Logo_AI_1.png")
-    st.image(logo, width=450)
+    st.image(logo, width=450) # Tamanho aumentado conforme solicitado
 except:
     st.title("👁️ AuditIA")
 
 st.markdown("### Auditoria de Integridade Digital")
 
-# 4. Interface de Trabalho (Imagens e PDF)
+# 4. Interface (Imagem e PDF)
 uploaded_file = st.file_uploader("📸 Envie evidências (Print ou PDF):", type=["jpg", "png", "jpeg", "pdf"])
 if uploaded_file and uploaded_file.type != "application/pdf":
     st.image(uploaded_file, use_container_width=True)
 
-user_input = st.text_area("📝 Descreva o caso ou cole o link:", placeholder="Ex: Analise este contrato/print e me diga se há riscos...", height=120)
+user_input = st.text_area("📝 Descreva o caso ou cole o link:", placeholder="Ex: Analise este contrato/print...", height=120)
 
-# Função para Gerar PDF de Saída
+# Função PDF de Saída (Relatório)
 def gerar_pdf_saida(texto, data_f):
     pdf = FPDF()
     pdf.add_page()
@@ -62,6 +62,7 @@ def gerar_pdf_saida(texto, data_f):
     pdf.cell(200, 10, txt=f"Data da Analise: {data_f}", ln=True, align='C')
     pdf.ln(10)
     pdf.set_font("Arial", size=11)
+    # Limpeza para evitar erros de caractere no PDF
     texto_limpo = texto.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
@@ -69,15 +70,14 @@ def gerar_pdf_saida(texto, data_f):
 # 5. Execução
 if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
     if not user_input and not uploaded_file:
-        st.warning("Por favor, forneça algum conteúdo.")
+        st.warning("Forneça conteúdo.")
     else:
-        # Fuso horário de Brasília exato
-        tz_br = pytz.timezone('America/Sao_Paulo')
-        data_br = datetime.now(tz_br).strftime("%d/%m/%Y %H:%M:%S")
+        # Horário de Brasília (UTC-3)
+        data_br = (datetime.now() - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
         
-        with st.spinner("🕵️ O AuditIA está rastreando padrões..."):
+        with st.spinner("Auditando..."):
             try:
-                instrucao = f"Aja como o AuditIA. Hoje é {data_br}. No início do veredito, use obrigatoriamente um destes termos: FRAUDE CONFIRMADA, POSSÍVEL FRAUDE, ATENÇÃO, SEGURO ou NEUTRO."
+                instrucao = f"Aja como o AuditIA perito em fraudes. Hoje é {data_br}. No início do veredito, classifique como: FRAUDE CONFIRMADA, POSSÍVEL FRAUDE, ATENÇÃO ou SEGURO."
                 conteudo = [instrucao]
                 if uploaded_file:
                     if uploaded_file.type == "application/pdf":
@@ -92,9 +92,9 @@ if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
                 st.subheader("📋 Relatório AuditIA")
                 st.markdown(aplicar_cor_veredito(resultado), unsafe_allow_html=True)
                 
-                # Download PDF
+                # Download PDF Automático após a análise
                 pdf_bytes = gerar_pdf_saida(resultado, data_br)
-                st.download_button(label="📥 Baixar Relatório em PDF", data=pdf_bytes, file_name=f"auditIA_{datetime.now(tz_br).strftime('%d%m%Y')}.pdf", mime="application/pdf")
+                st.download_button(label="📥 Baixar Relatório em PDF", data=pdf_bytes, file_name=f"auditIA_{datetime.now().strftime('%d%m%Y')}.pdf", mime="application/pdf")
             except Exception as e:
                 st.error(f"Erro: {e}")
 
@@ -102,18 +102,16 @@ if st.button("🚀 INICIAR AUDITORIA INTELIGENTE"):
 st.markdown("---")
 with st.expander("💡 MANUAL DE UTILIZAÇÃO - Como dominar o AuditIA"):
     st.markdown("""
-    O **AuditIA** é uma inteligência pericial multimodal. Para obter diagnósticos 100% precisos, siga estas diretrizes:
+    O **AuditIA** utiliza inteligência pericial para proteger sua integridade digital:
     
-    * **Análise de Prints (WhatsApp/Instagram)**: Ao enviar um print, não apenas suba o arquivo. Use o campo de texto para perguntar: *"Este tom de linguagem condiz com uma empresa real ou parece engenharia social?"*.
-    * **Verificação de Documentos (PDF)**: O robô pode ler contratos e boletos. Peça para ele: *"Verifique se o CNPJ citado neste PDF é válido e se há cláusulas abusivas ou suspeitas"*.
-    * **Rastreamento de Dados Bancários**: Se houver uma chave PIX ou conta na imagem, o AuditIA analisa a estrutura do dado para identificar se pertence a contas "laranjas" comumente usadas em golpes.
-    * **Validação de Prazos**: O AuditIA sabe a data de hoje. Use isso para verificar se uma oferta com "contagem regressiva" é uma pressão psicológica falsa.
-    * **O Semáforo de Risco**: 
-        * 🔴 **FRAUDE**: Pare imediatamente qualquer transação.
-        * 🟠 **POSSÍVEL FRAUDE**: Alto índice de inconsistência.
-        * 🟡 **ATENÇÃO**: Há elementos suspeitos que precisam de mais investigação.
-        * 🟢 **SEGURO**: Os dados seguem padrões de integridade digital.
+    * **Análise de Prints**: Envie capturas de tela do WhatsApp ou Instagram. O robô identifica padrões de manipulação psicológica e engenharia social.
+    * **Leitura de PDFs**: Suba contratos ou boletos suspeitos. O AuditIA extrai dados e verifica inconsistências em CNPJs ou links de pagamento.
+    * **Consciência Temporal**: O robô sabe a data e hora atual de Brasília, essencial para validar se um boleto está vencido ou se uma oferta é um golpe de "urgência falsa".
+    * **Semáforo de Veredito**:
+        * 🔴 **FRAUDE CONFIRMADA**: Risco imediato detectado.
+        * 🟠 **POSSÍVEL FRAUDE**: Alto índice de suspeita.
+        * 🟡 **ATENÇÃO**: Elementos duvidosos presentes.
+        * 🟢 **SEGURO**: Padrões de integridade validados.
     """)
 
-st.caption(f"AuditIA - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
-
+st.caption("AuditIA - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
