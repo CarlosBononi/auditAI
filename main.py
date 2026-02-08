@@ -8,31 +8,24 @@ from email import policy
 from datetime import datetime
 import pytz
 
-# 1. GESTÃO DE SESSÃO PERICIAL (MEMÓRIA)
+# 1. GESTÃO DE SESSÃO PERICIAL
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
-    st.session_state.campo_pergunta = "" # Limpa a caixa de texto
+    st.session_state.campo_pergunta = "" 
 
 st.set_page_config(page_title="AuditIA - Inteligência Pericial", page_icon="👁️", layout="centered")
 
-# 2. O SEMÁFORO (LÓGICA DE CORES REINTEGRADA E BLINDADA)
+# 2. SEMÁFORO DE CORES COM CLASSIFICAÇÃO BLINDADA
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
-    
-    # VERIFICAÇÃO RIGOROSA DAS CORES
-    if "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper:
-        cor, font = "#ff4b4b", "white" # VERMELHO
-    elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in texto_upper:
-        cor, font = "#ffa500", "white" # LARANJA
-    elif "CLASSIFICAÇÃO: ATENÇÃO" in texto_upper:
-        cor, font = "#f1c40f", "black" # AMARELO
-    elif "CLASSIFICAÇÃO: SEGURO" in texto_upper:
-        cor, font = "#2ecc71", "white" # VERDE
-    else:
-        cor, font = "#3498db", "white" # AZUL (Informativo / Neutro)
+    if "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper: cor, font = "#ff4b4b", "white"
+    elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in texto_upper: cor, font = "#ffa500", "white"
+    elif "CLASSIFICAÇÃO: ATENÇÃO" in texto_upper: cor, font = "#f1c40f", "black"
+    elif "CLASSIFICAÇÃO: SEGURO" in texto_upper: cor, font = "#2ecc71", "white"
+    else: cor, font = "#3498db", "white"
     
     return f'''
     <div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font}; 
@@ -44,13 +37,13 @@ def aplicar_estilo_pericial(texto):
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #333333; }
-    div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; border: none; }
+    div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; }
     div.stButton > button:first-child:hover { background-color: #59ea63; color: black; transition: 0.3s; }
     .stTextArea textarea { background-color: #f8f9fa; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. CONEXÃO SEGURA (ANTI-404)
+# 3. CONEXÃO SEGURA E SELEÇÃO DINÂMICA
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos_disp = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -58,7 +51,7 @@ try:
 except Exception as e:
     st.error(f"Erro de Conexão: {e}"); st.stop()
 
-# 4. CABEÇALHO (Logo 500px à Esquerda)
+# 4. CABEÇALHO (Branding Consolidado)
 try:
     logo = Image.open("Logo_AI_1.png")
     st.image(logo, width=500)
@@ -68,29 +61,28 @@ except:
 st.markdown("---")
 
 # 5. ÁREA DE PERÍCIA
-uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs até 1000 pág, E-mails .eml ou .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
+uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs, E-mails .eml ou .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
 if uploaded_file and uploaded_file.type not in ["application/pdf"] and not uploaded_file.name.endswith(('.eml', '.pst')):
     st.image(uploaded_file, use_container_width=True)
 
-# HISTÓRICO COM RASTREABILIDADE TOTAL
 st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Sua dúvida técnica ou busca e-discovery aqui...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Esta foto de pessoa foi gerada por IA?'...", height=120)
 
 # FUNÇÃO LAUDO PDF
 def gerar_pdf_pericial(conteudo, data_f):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(200, 15, txt="LAUDO TÉCNICO PERICIAL - AUDITIA", ln=True, align='C')
-    pdf.set_font("Arial", size=10); pdf.cell(200, 10, txt=f"Data da Perícia: {data_f}", ln=True, align='C')
+    pdf.set_font("Arial", size=10); pdf.cell(200, 10, txt=f"Data: {data_f}", ln=True, align='C')
     pdf.ln(10); pdf.set_font("Arial", size=11)
     texto_limpo = conteudo.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 6. MOTOR DE EXECUÇÃO
+# 6. MOTOR DE EXECUÇÃO (PROTOCOLO ANATOMIA CRÍTICA)
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
@@ -100,16 +92,19 @@ with col1:
         else:
             tz_br = pytz.timezone('America/Sao_Paulo')
             agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ Realizando varredura..."):
+            with st.spinner("🕵️ Auditando com Protocolo de Anatomia Crítica..."):
                 try:
                     instrucao = f"""
                     Aja como o AuditIA. Hoje é {agora}.
-                    VOCÊ DEVE SEGUIR ESTA ESTRUTURA SEM FALHAS:
-                    1. CABEÇALHO: Inicie com 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"'
-                    2. CLASSIFICAÇÃO: Na linha seguinte, escreva 'CLASSIFICAÇÃO: [TIPO]'. 
-                       (Use FRAUDE CONFIRMADA, POSSÍVEL FRAUDE, ATENÇÃO, SEGURO ou INFORMATIVO / NEUTRO).
-                    3. RESPOSTA: Responda diretamente e tecnicamente.
-                    4. FECHAMENTO: 'Resumo do Veredito:'.
+                    PROTOCOLO DE IMAGEM 2026:
+                    1. Ao analisar fotos de pessoas, você deve ser EXTREMAMENTE CÉTICO. 
+                    2. VERIFICAÇÃO OBRIGATÓRIA: Analise mãos (dedos fundidos ou extras), articulações, dentes e reflexos nos olhos. 
+                    3. Se houver qualquer "suavização" artificial ou iluminação perfeita demais para uma foto comum, classifique como 'ATENÇÃO' ou 'POSSÍVEL FRAUDE'.
+                    4. ESTRUTURA:
+                       - CABEÇALHO: 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"'
+                       - CLASSIFICAÇÃO: [TIPO]
+                       - RESPOSTA: Resposta técnica direta.
+                       - FECHAMENTO: 'Resumo do Veredito:'.
                     """
                     contexto = [instrucao]
                     for h in st.session_state.historico_pericial: contexto.append(h)
@@ -118,7 +113,7 @@ with col1:
                         if uploaded_file.name.endswith('.eml'):
                             msg = email.message_from_bytes(uploaded_file.read(), policy=policy.default)
                             corpo = msg.get_body(preferencelist=('plain')).get_content()
-                            contexto.append(f"DADOS DO E-MAIL: {corpo}")
+                            contexto.append(f"E-MAIL: {corpo}")
                         elif uploaded_file.type == "application/pdf":
                             contexto.append({"mime_type": "application/pdf", "data": uploaded_file.read()})
                         else:
@@ -129,31 +124,27 @@ with col1:
                     st.session_state.historico_pericial.append(response.text)
                     st.rerun()
                 except Exception as e:
-                    if "exceeds the supported page limit" in str(e):
-                        st.error("⚠️ Limite de 1000 páginas excedido.")
-                    else: st.error(f"Erro técnico: {e}")
+                    if "exceeds the supported page limit" in str(e): st.error("⚠️ Limite de 1000 páginas excedido.")
+                    else: st.error(f"Erro: {e}")
 
 with col2:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []
         st.rerun()
 
-# DOWNLOAD PDF
 if st.session_state.historico_pericial:
     tz_br = pytz.timezone('America/Sao_Paulo')
     pdf_bytes = gerar_pdf_pericial(st.session_state.historico_pericial[-1], datetime.now(tz_br).strftime("%d/%m/%Y %H:%M"))
     st.download_button(label="📥 Baixar Laudo PDF", data=pdf_bytes, file_name="Laudo_AuditIA.pdf", mime="application/pdf")
 
-# 7. GUIA MESTRE (ROBUSTO)
+# 7. GUIA MESTRE (MANUAL DE ELITE)
 st.markdown("---")
 with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia"):
     st.markdown("""
-    ### 🛡️ Inteligência Forense de Elite
-    O **AuditIA** é uma plataforma multimodal para auditorias complexas.
-    
-    * 🚦 **Semáforo de Risco:** Vermelho (Fraude), Laranja (Suspeito), Amarelo (Atenção), Verde (Seguro), Azul (Neutro).
-    * 🕵️‍♀️ **Forense de Massa:** Suporte para arquivos .pst e .eml para e-discovery.
-    * 🧠 **Memória de Sessão:** Histórico para perguntas de acompanhamento sem perda de contexto.
+    ### 🛡️ Inteligência Forense Profissional
+    * 🕵️‍♀️ **Forense de Imagem:** Detecção de micro-anomalias anatômicas e sintéticas.
+    * ✉️ **e-Discovery & PST:** Auditoria inteligente de e-mails em massa.
+    * 🧠 **Memória Iterativa:** Histórico de investigação para perguntas de acompanhamento.
     """)
 
-st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
+st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
