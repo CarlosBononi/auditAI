@@ -8,24 +8,26 @@ from email import policy
 from datetime import datetime
 import pytz
 
-# 1. GESTÃO DE SESSÃO PERICIAL (MEMÓRIA)
+# 1. GESTÃO DE SESSÃO PERICIAL
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
-    st.session_state.campo_pergunta = "" # Limpeza automática do input
+    st.session_state.campo_pergunta = "" 
 
 st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
 
-# 2. SEMÁFORO DE CORES COM CLASSIFICAÇÃO BLINDADA
+# 2. SEMÁFORO DE CORES (LÓGICA INVERTIDA E BLINDADA)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
-    if "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper: cor, font = "#ff4b4b", "white"
+    # SE O ROBÔ DESOBEDECER E USAR AZUL PARA IMAGEM DE PESSOA, FORÇA O AMARELO
+    if "CLASSIFICAÇÃO: SEGURO" in texto_upper or ("INFORMATIVO" in texto_upper and ("IMAGEM" in texto_upper or "FOTO" in texto_upper)):
+        cor, font = "#f1c40f", "black" # AMARELO (ATENÇÃO FORÇADA)
+    elif "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper: cor, font = "#ff4b4b", "white"
     elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in texto_upper: cor, font = "#ffa500", "white"
     elif "CLASSIFICAÇÃO: ATENÇÃO" in texto_upper: cor, font = "#f1c40f", "black"
-    elif "CLASSIFICAÇÃO: SEGURO" in texto_upper: cor, font = "#2ecc71", "white"
-    else: cor, font = "#3498db", "white" # Azul (Informativo / Neutro)
+    else: cor, font = "#3498db", "white" # Azul (Informativo genuíno sobre documentos/texto)
     
     return f'''
     <div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font}; 
@@ -49,7 +51,7 @@ try:
     modelos_disp = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     model = genai.GenerativeModel(modelos_disp[0])
 except Exception as e:
-    st.error(f"Erro de Conexão API: {e}"); st.stop()
+    st.error(f"Erro de Conexão: {e}"); st.stop()
 
 # 4. CABEÇALHO (Logo 500px)
 try:
@@ -61,29 +63,29 @@ except:
 st.markdown("---")
 
 # 5. ÁREA DE PERÍCIA MULTIMODAL
-uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs até 1000 pág, E-mails .eml ou .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
+uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs, E-mails .eml, .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
 if uploaded_file and uploaded_file.type not in ["application/pdf"] and not uploaded_file.name.endswith(('.eml', '.pst')):
     st.image(uploaded_file, use_container_width=True)
 
-# EXIBIÇÃO DO HISTÓRICO COM RASTREABILIDADE
+# HISTÓRICO COM RASTREABILIDADE
 st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Sua dúvida técnica ou busca e-discovery aqui...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Esta imagem foi gerada por IA?'...", height=120)
 
-# FUNÇÃO LAUDO PDF CONSOLIDADO
+# FUNÇÃO LAUDO PDF
 def gerar_pdf_pericial(conteudo, data_f):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(200, 15, txt="LAUDO TÉCNICO PERICIAL - AUDITIA", ln=True, align='C')
-    pdf.set_font("Arial", size=10); pdf.cell(200, 10, txt=f"Data da Perícia: {data_f}", ln=True, align='C')
+    pdf.set_font("Arial", size=10); pdf.cell(200, 10, txt=f"Data: {data_f}", ln=True, align='C')
     pdf.ln(10); pdf.set_font("Arial", size=11)
     texto_limpo = conteudo.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 6. MOTOR PERICIAL COM PROTOCOLO DE DESCONFIANÇA MÁXIMA
+# 6. MOTOR PERICIAL COM FILTRO DE FRAUDE OBRIGATÓRIO
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
@@ -93,17 +95,16 @@ with col1:
         else:
             tz_br = pytz.timezone('America/Sao_Paulo')
             agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ Realizando varredura anatômica profunda..."):
+            with st.spinner("🕵️ Executando Protocolo de Fraude por IA..."):
                 try:
                     instrucao = f"""
-                    Aja como o AuditIA, inteligência forense de elite para e-discovery. Hoje é {agora}.
+                    Aja como o AuditIA, inteligência forense de elite. Data: {agora}.
                     
-                    REGRA DE OURO PARA IMAGENS: 
-                    1. Imagens de pessoas (especialmente fotorrealistas como Wix/Midjourney) devem ser tratadas com CETICISMO MÁXIMO. 
-                    2. VARREDURA OBRIGATÓRIA: Verifique fusão de dedos nas mãos, número de articulações, dentes e reflexos oculares. 
-                    3. Se detectar anatomia impossível, use 'CLASSIFICAÇÃO: FRAUDE CONFIRMADA'. 
-                    4. Se houver "perfeição plástica" ou suavização de pele artificial, use 'CLASSIFICAÇÃO: ATENÇÃO' ou 'POSSÍVEL FRAUDE'.
-                    5. ESTRUTURA: Inicie com 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"', seguido de 'CLASSIFICAÇÃO: [TIPO]'.
+                    REGRA DE OURO (INVERSÃO DO ÔNUS DA PROVA):
+                    1. PARA IMAGENS FOTORREALISTAS DE PESSOAS: Assuma que é GERAÇÃO POR IA (FRAUDE) até que se prove o contrário com evidências FÍSICAS (não visuais), como ruído de sensor ou aberração cromática.
+                    2. PROIBIÇÃO DE 'SEGURO': Você NÃO PODE classificar uma imagem de pessoa como "SEGURO" ou "REAL" baseando-se apenas em "parecer real". 
+                    3. CLASSIFICAÇÃO OBRIGATÓRIA: Se a imagem for de uma pessoa e não apresentar erro anatômico óbvio, você DEVE usar 'CLASSIFICAÇÃO: ATENÇÃO (ALTA PROBABILIDADE DE IA)'. Se houver erro, use 'FRAUDE CONFIRMADA'.
+                    4. ESTRUTURA: Inicie com 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"', seguido de 'CLASSIFICAÇÃO: [TIPO]'.
                     """
                     contexto = [instrucao]
                     for h in st.session_state.historico_pericial: contexto.append(h)
@@ -135,23 +136,23 @@ with col2:
 if st.session_state.historico_pericial:
     tz_br = pytz.timezone('America/Sao_Paulo')
     pdf_bytes = gerar_pdf_pericial(st.session_state.historico_pericial[-1], datetime.now(tz_br).strftime("%d/%m/%Y %H:%M"))
-    st.download_button(label="📥 Baixar Laudo da Última Análise (PDF)", data=pdf_bytes, file_name="Laudo_AuditIA.pdf", mime="application/pdf")
+    st.download_button(label="📥 Baixar Laudo PDF", data=pdf_bytes, file_name="Laudo_AuditIA.pdf", mime="application/pdf")
 
-# 7. GUIA MESTRE AUDITIA - RESTAURAÇÃO TOTAL (7 PILARES)
+# 7. GUIA MESTRE AUDITIA (COMPLETO)
 st.markdown("---")
 with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite"):
     st.markdown("""
     ### 🛡️ Inteligência Forense Profissional
-    O **AuditIA** é uma inteligência forense multimodal projetada para desmascarar crimes cibernéticos e realizar e-discovery profissional em tempo real.
+    O **AuditIA** é uma inteligência forense multimodal projetada para desmascarar crimes cibernéticos e realizar e-discovery profissional.
 
     **Capacidades Técnicas Detalhadas:**
-    1.  **Análise Multifacetada de Documentos**: Processamento profundo de prints, PDFs e blocos de texto buscando anomalias visuais ou estruturais.
-    2.  **Detecção de Artefatos de IA**: Scrutínio de micro-anomalias anatômicas, texturas sintéticas e inconsistências de física em imagens geradas.
-    3.  **e-Discovery & PST/EML**: Busca inteligente em massa dentro de arquivos Outlook (.pst) e e-mails (.eml) para identificar intenções corporativas.
-    4.  **Identificação de Engenharia Social**: Desmascara táticas de manipulação psicológica, phishing e spoofing comportamental.
-    5.  **Reconhecimento de Esquemas Ponzi**: Avaliação técnica de modelos de pirâmide financeira e promessas de retorno garantido.
-    6.  **Verificação de Consistência Documental**: Comparação de metadados, fontes e selos de segurança em recibos e contratos.
-    7.  **Indicadores de Compromisso (IoCs)**: Mapeamento de URLs maliciosas, domínios e IPs associados a atividades criminosas.
+    1.  **Análise Multifacetada de Documentos**: Processamento profundo de prints e PDFs buscando anomalias visuais.
+    2.  **Detecção de Artefatos de IA**: Scrutínio de micro-anomalias anatômicas em imagens geradas.
+    3.  **e-Discovery & PST/EML**: Busca inteligente em massa de e-mails para identificar intenções.
+    4.  **Identificação de Engenharia Social**: Desmascara táticas de phishing e spoofing comportamental.
+    5.  **Reconhecimento de Esquemas Ponzi**: Avaliação de modelos de pirâmide financeira.
+    6.  **Verificação de Consistência Documental**: Comparação de metadados em recibos e contratos.
+    7.  **Indicadores de Compromisso (IoCs)**: Mapeamento de URLs e IPs maliciosos.
 
     ---
     ### 🚦 Semáforo de Risco Pericial:
