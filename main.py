@@ -7,6 +7,7 @@ import email
 from email import policy
 from datetime import datetime
 import pytz
+import time
 
 # 1. GESTÃO DE SESSÃO PERICIAL
 if "historico_pericial" not in st.session_state:
@@ -18,22 +19,15 @@ def processar_pericia():
 
 st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
 
-# 2. SEMÁFORO DE CORES COM TRAVA LÓGICA PARA IMAGENS
+# 2. SEMÁFORO DE CORES COM TRAVA LÓGICA V17 (BLINDADO)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
-    
-    # TRAVA V16: Se o contexto envolver Imagem/Foto e não for Fraude Confirmada, FORÇA o Amarelo (Atenção)
-    # Isso impede que o sistema use Azul para fotos sintéticas "perfeitas"
-    if "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper:
-        cor, font = "#ff4b4b", "white" # VERMELHO
-    elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in texto_upper:
-        cor, font = "#ffa500", "white" # LARANJA
-    elif "CLASSIFICAÇÃO: ATENÇÃO" in texto_upper or "IMAGEM" in texto_upper or "FOTO" in texto_upper or "IA" in texto_upper:
-        cor, font = "#f1c40f", "black" # AMARELO (Protocolo de Dúvida)
-    elif "CLASSIFICAÇÃO: SEGURO" in texto_upper:
-        cor, font = "#2ecc71", "white" # VERDE
-    else:
-        cor, font = "#3498db", "white" # AZUL (Apenas para Textos/Documentos Neutros)
+    if "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper: cor, font = "#ff4b4b", "white"
+    elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in texto_upper: cor, font = "#ffa500", "white"
+    elif "CLASSIFICAÇÃO: ATENÇÃO" in texto_upper or "IMAGEM" in texto_upper or "FOTO" in texto_upper:
+        cor, font = "#f1c40f", "black" # AMARELO FORÇADO PARA IMAGENS
+    elif "CLASSIFICAÇÃO: SEGURO" in texto_upper: cor, font = "#2ecc71", "white"
+    else: cor, font = "#3498db", "white" # AZUL (Neutro)
     
     return f'''
     <div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font}; 
@@ -51,15 +45,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. CONEXÃO SEGURA E SELEÇÃO DINÂMICA
+# 3. CONEXÃO SEGURA (MODO RESILIENTE)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos_disp = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     model = genai.GenerativeModel(modelos_disp[0])
 except Exception as e:
-    st.error(f"Erro de Conexão: {e}"); st.stop()
+    st.error("Erro de conexão com a infraestrutura Google."); st.stop()
 
-# 4. CABEÇALHO (Logo 500px)
+# 4. CABEÇALHO
 try:
     logo = Image.open("Logo_AI_1.png")
     st.image(logo, width=500)
@@ -69,7 +63,7 @@ except:
 st.markdown("---")
 
 # 5. ÁREA DE PERÍCIA
-uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs até 1000 pág, E-mails .eml ou .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
+uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs, E-mails .eml ou .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
 if uploaded_file and uploaded_file.type not in ["application/pdf"] and not uploaded_file.name.endswith(('.eml', '.pst')):
     st.image(uploaded_file, use_container_width=True)
 
@@ -77,20 +71,20 @@ st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Esta foto de pessoa é real? Analise mãos, olhos e textura de pele.'...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Faça sua pergunta de acompanhamento...", height=120)
 
 # FUNÇÃO LAUDO PDF
 def gerar_pdf_pericial(conteudo, data_f):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(200, 15, txt="LAUDO TÉCNICO PERICIAL - AUDITIA", ln=True, align='C')
-    pdf.set_font("Arial", size=10); pdf.cell(200, 10, txt=f"Data da Perícia: {data_f}", ln=True, align='C')
+    pdf.set_font("Arial", size=10); pdf.cell(200, 10, txt=f"Data: {data_f}", ln=True, align='C')
     pdf.ln(10); pdf.set_font("Arial", size=11)
     texto_limpo = conteudo.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 6. MOTOR PERICIAL COM PROTOCOLO DE ANÁLISE MANDATÓRIA
+# 6. MOTOR DE EXECUÇÃO (TRATAMENTO DE ERRO 429)
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
@@ -100,20 +94,14 @@ with col1:
         else:
             tz_br = pytz.timezone('America/Sao_Paulo')
             agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ Realizando auditoria técnica profunda..."):
+            with st.spinner("🕵️ Realizando auditoria forense..."):
                 try:
                     instrucao = f"""
-                    Aja como o AuditIA, inteligência forense de elite para e-discovery. Hoje é {agora}.
-                    
-                    PROTOCOLO V16 - IMAGENS SINTÉTICAS:
-                    1. Imagens de pessoas devem ser analisadas com CETICISMO MÁXIMO. 
-                    2. Você está PROIBIDO de dar pareceres curtos ou puramente informativos para fotos de pessoas.
-                    3. ANALISE OBRIGATORIAMENTE:
-                       - ANATOMIA: Verifique fusão de dedos, número de articulações e dentes.
-                       - FÍSICA DA LUZ: Observe se os reflexos oculares e sombras são coerentes com uma única fonte.
-                       - TEXTURA DE PELE: Identifique "perfeição plástica" ou ausência de poros reais e ruído digital.
-                    4. Se não houver prova física de que a foto veio de uma câmera (EXIF ou ruído de sensor), sua classificação padrão deve ser 'ATENÇÃO (ALTA PROBABILIDADE DE IA)'.
-                    5. ESTRUTURA: Inicie com 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"', seguido de 'CLASSIFICAÇÃO: [TIPO]'.
+                    Aja como o AuditIA. Hoje é {agora}.
+                    REGRA V16/V17: Imagens de pessoas são tratadas com CETICISMO MÁXIMO.
+                    ANÁLISE OBRIGATÓRIA: Anatomia (mãos/dedos), Física da Luz, Textura de Pele e Ruído de Sensor.
+                    CLASSIFICAÇÃO: Se for foto de pessoa e não houver prova física de câmera, use 'CLASSIFICAÇÃO: ATENÇÃO (ALTA PROBABILIDADE DE IA)'.
+                    ESTRUTURA: Cabeçalho com pergunta e horário -> Classificação -> Parecer Técnico Detalhado.
                     """
                     contexto = [instrucao]
                     for h in st.session_state.historico_pericial: contexto.append(h)
@@ -133,35 +121,33 @@ with col1:
                     st.session_state.historico_pericial.append(response.text)
                     st.rerun()
                 except Exception as e:
-                    if "exceeds the supported page limit" in str(e): st.error("⚠️ Limite de 1000 páginas excedido.")
-                    else: st.error(f"Erro técnico: {e}")
+                    if "429" in str(e):
+                        st.error("⚠️ LIMITE DE COTA: Muitas perguntas em pouco tempo. Por favor, aguarde 60 segundos para o servidor processar sua próxima perícia.")
+                    elif "exceeds the supported page limit" in str(e):
+                        st.error("⚠️ Limite de 1000 páginas excedido.")
+                    else:
+                        st.error(f"Erro técnico: {e}")
 
 with col2:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []
         st.rerun()
 
-# GERADOR DE PDF
 if st.session_state.historico_pericial:
     tz_br = pytz.timezone('America/Sao_Paulo')
     pdf_bytes = gerar_pdf_pericial(st.session_state.historico_pericial[-1], datetime.now(tz_br).strftime("%d/%m/%Y %H:%M"))
-    st.download_button(label="📥 Baixar Laudo da Última Análise (PDF)", data=pdf_bytes, file_name="Laudo_AuditIA.pdf", mime="application/pdf")
+    st.download_button(label="📥 Baixar Laudo PDF", data=pdf_bytes, file_name="Laudo_AuditIA.pdf", mime="application/pdf")
 
-# 7. GUIA MESTRE AUDITIA - RESTAURAÇÃO TOTAL (7 PILARES)
+# 7. GUIA MESTRE (7 PILARES)
 st.markdown("---")
-with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite"):
+with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia"):
     st.markdown("""
     ### 🛡️ Inteligência Forense Profissional
-    O **AuditIA** é uma inteligência forense multimodal projetada para desmascarar crimes cibernéticos e realizar e-discovery profissional em tempo real.
-
-    **Capacidades Técnicas Detalhadas:**
-    1.  **Análise Multifacetada de Documentos**: Processamento profundo de prints (WhatsApp/Instagram), PDFs e blocos de texto buscando anomalias visuais ou estruturais.
-    2.  **Detecção de Artefatos de IA**: Scrutínio de micro-anomalias anatômicas, texturas sintéticas e inconsistências de física em imagens geradas.
-    3.  **e-Discovery & PST/EML**: Busca inteligente em massa dentro de arquivos de dados do Outlook (.pst) e e-mails individuais (.eml) para identificar intenções e fraudes corporativas.
-    4.  **Identificação de Engenharia Social**: Análise de linguagem e comportamento sugerido para desmascarar tentativas de manipulação psicológica, phishing e spoofing.
-    5.  **Reconhecimento de Esquemas Ponzi/Pirâmide**: Avaliação técnica de modelos de negócios com promessas de retorno garantido.
-    6.  **Verificação de Consistência Documental**: Comparação de dados, fontes, metadados e selos de segurança em recibos, contratos e boletos.
-    7.  **Indicadores de Compromisso (IoCs)**: Identificação técnica de URLs maliciosas, domínios e e-mails associados a atividades criminosas.
+    * 🕵️‍♀️ **Análise de Imagem:** Anatomia crítica e artefatos de IA.
+    * ✉️ **e-Discovery & PST/EML:** Auditoria de massa de e-mails.
+    * 🧠 **Memória Iterativa:** Histórico para perguntas de acompanhamento.
+    * 🚦 **Semáforo de Risco:** Vermelho, Laranja, Amarelo, Verde e Azul.
+    * ⚙️ **Outras Funções:** Engenharia Social, Ponzi, Consistência Documental e IoCs.
     """)
 
 st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
