@@ -8,17 +8,19 @@ from email import policy
 from datetime import datetime
 import pytz
 
-# 1. GESTÃO DE SESSÃO E ACÚMULO DE PROVAS
+# 1. GESTÃO DE SESSÃO E ACÚMULO DE PROVAS (PONTO 4)
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
 if "arquivos_acumulados" not in st.session_state:
     st.session_state.arquivos_acumulados = []
+if "chat_suporte" not in st.session_state:
+    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Posso te ajudar a auditar links, verificar documentos ou realizar e-discovery. O que precisa?"}]
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
     st.session_state.campo_pergunta = "" 
 
-st.set_page_config(page_title="AuditIA - Inteligência Forense Elite", page_icon="👁️", layout="wide")
+st.set_page_config(page_title="AuditIA - Inteligência Forense Profissional", page_icon="👁️", layout="wide")
 
 # 2. SEMÁFORO DE CORES BLINDADO
 def aplicar_estilo_pericial(texto):
@@ -30,45 +32,21 @@ def aplicar_estilo_pericial(texto):
     else: cor, font = "#3498db", "white"
     return f'<div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font}; font-weight: bold; border: 2px solid #4a4a4a; margin-bottom: 25px;">{texto}</div>'
 
-st.markdown("""<style>.stApp { background-color: #ffffff; color: #333333; } div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; } .stTextArea textarea { background-color: #f8f9fa; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px; }</style>""", unsafe_allow_html=True)
+# CSS PARA O CHAT FLUTUANTE E LAYOUT (PONTO 5)
+st.markdown("""
+    <style>
+    .stApp { background-color: #ffffff; color: #333333; }
+    div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; }
+    .floating-chat { position: fixed; bottom: 20px; right: 20px; width: 350px; background: white; border: 1px solid #ddd; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000; padding: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # 3. CONEXÃO ESTÁVEL (FIX DEFINITIVO ERRO 404)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # Chamada explícita para evitar conflito de versão v1beta
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"Erro de Inicialização: {e}"); st.stop()
-
-# SIDEBAR - CONCIERGE AUDITIA (HUMANIZADO E RESPONSIVO)
-with st.sidebar:
-    st.header("🤖 Concierge AuditIA")
-    st.write("Olá! Sou seu assistente de suporte. Estou aqui para guiar sua perícia.")
-    
-    # OPÇÕES DE ESCOLHA RÁPIDA (PONTO 5)
-    st.subheader("Sugestões de Apoio:")
-    col_a, col_b = st.columns(2)
-    if col_a.button("Auditando E-mails"): st.info("Suba arquivos .eml ou .pst. Analiso cabeçalhos, remetentes e links.")
-    if col_b.button("Auditando Imagens"): st.info("Procuro por artefatos de IA, erros anatômicos e inconsistências de luz.")
-    
-    duvida_extra = st.text_input("Como posso ajudar agora?")
-    if duvida_extra:
-        # Prompt que ensina o assistente a responder antes de desistir
-        prompt_ajuda = f"""
-        Aja como um atendente sênior humanizado do AuditIA. 
-        Conhecimento: Analisamos imagens (IA), E-mails (.eml/.pst), PDFs (até 1000 pág) e e-discovery. 
-        AVISO: Atualmente NÃO auditamos arquivos de vídeo diretamente.
-        Responda de forma clara: {duvida_extra}. 
-        Se o usuário perguntar de vídeo, explique que estamos trabalhando nisso. 
-        Só sugira o e-mail auditaiajuda@gmail.com se for uma falha técnica ou dúvida jurídica complexa.
-        """
-        try:
-            res_ajuda = model.generate_content(prompt_ajuda)
-            st.info(res_ajuda.text)
-        except: st.write("Para suporte avançado, encaminhe sua dúvida para: auditaiajuda@gmail.com")
-    
-    st.markdown("---")
-    st.caption("AuditIA V24 - Vargem Grande do Sul - SP")
+    st.error("Erro de conexão com o servidor pericial. Tente novamente em instantes."); st.stop()
 
 # 4. CABEÇALHO
 try:
@@ -96,9 +74,9 @@ st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Estes e-mails apresentam algum padrão de fraude financeira?'...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Analise a veracidade destes documentos e busque links suspeitos'...", height=120)
 
-# 6. MOTOR DE AUDITORIA (BLINDAGEM V24)
+# 6. MOTOR DE AUDITORIA (BLINDAGEM V25)
 col_ex, col_limp = st.columns([1, 1])
 with col_ex:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
@@ -109,10 +87,10 @@ with col_ex:
             tz_br = pytz.timezone('America/Sao_Paulo'); agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
             with st.spinner("🕵️ AuditIA realizando varredura pericial..."):
                 try:
-                    instrucao = f"""Aja como AuditIA, perito forense sênior. Hoje: {agora}.
-                    1. Inicie com **CLASSIFICAÇÃO: [TIPO]** em negrito.
+                    instrucao = f"""Aja como AuditIA, perito sênior. Hoje: {agora}.
+                    1. Inicie com **CLASSIFICAÇÃO: [TIPO]** em negrito e maiúsculas.
                     2. Logo abaixo: 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"'.
-                    3. Analise todos os arquivos acumulados buscando fraudes, inconsistências ou sinais de IA.
+                    3. Analise links, documentos e imagens acumulados buscando fraudes.
                     4. Encerre com **RESUMO DO VEREDITO:**."""
                     
                     contexto = [instrucao]
@@ -128,19 +106,35 @@ with col_ex:
                     response = model.generate_content(contexto)
                     st.session_state.historico_pericial.append(response.text)
                     st.rerun()
-                except Exception as e: st.error(f"Erro técnico na análise: {e}")
+                except Exception as e: st.error(f"Erro na análise: Verifique sua conexão ou volume de dados.")
 
 with col_limp:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
 
-# 7. GUIA MESTRE (PONTO 3 - PRESERVADO)
+# 7. CONCIERGE FLUTUANTE (PONTO 5)
 st.markdown("---")
-with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia"):
-    st.markdown("""### 🛡️ Inteligência Forense Profissional
-    * 🕵️‍♀️ **Forense de Imagem**: Anatomia crítica e artefatos de IA.
-    * ✉️ **e-Discovery & PST**: Auditoria de e-mails em massa.
-    * 🚦 **Semáforo de Risco**: Vermelho, Laranja, Amarelo, Verde e Azul.
-    * 🧠 **Memória Iterativa**: Histórico para follow-up sem perda de contexto.""")
+with st.expander("💬 Conversar com Concierge AuditIA", expanded=False):
+    st.write("Estou aqui para tirar suas dúvidas sobre o sistema de forma humanizada.")
+    for msg in st.session_state.chat_suporte:
+        with st.chat_message(msg["role"]): st.write(msg["content"])
+    
+    if prompt := st.chat_input("Como posso ajudar?"):
+        st.session_state.chat_suporte.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.write(prompt)
+        
+        with st.chat_message("assistant"):
+            knowledge = """
+            Você é o Concierge AuditIA. Você sabe:
+            - Auditamos links suspeitos e phishing.
+            - Verificamos veracidade de documentos e contratos.
+            - Analisamos e-mails (.eml/.pst) e PDFs (até 1000 pág).
+            - Identificamos IA em imagens (Anatomia Crítica).
+            - Atualmente NÃO analisamos vídeo diretamente.
+            Responda de forma humanizada. Só peça para enviar e-mail para auditaiajuda@gmail.com se for algo que você realmente não resolve.
+            """
+            response = model.generate_content(knowledge + prompt)
+            st.write(response.text)
+            st.session_state.chat_suporte.append({"role": "assistant", "content": response.text})
 
 st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
