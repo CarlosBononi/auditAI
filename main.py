@@ -8,7 +8,7 @@ from email import policy
 from datetime import datetime
 import pytz
 
-# 1. GESTÃO DE SESSÃO E ACÚMULO DE ARQUIVOS (PONTO 4)
+# 1. GESTÃO DE SESSÃO E ACÚMULO
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
 if "arquivos_acumulados" not in st.session_state:
@@ -18,9 +18,9 @@ def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
     st.session_state.campo_pergunta = "" 
 
-st.set_page_config(page_title="AuditIA - Inteligência Forense Estável", page_icon="👁️", layout="wide")
+st.set_page_config(page_title="AuditIA - Inteligência Forense Elite", page_icon="👁️", layout="wide")
 
-# 2. SEMÁFORO DE CORES BLINDADO (PONTO 1)
+# 2. SEMÁFORO DE CORES BLINDADO
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     if "FRAUDE CONFIRMADA" in texto_upper: cor, font = "#ff4b4b", "white"
@@ -32,27 +32,41 @@ def aplicar_estilo_pericial(texto):
 
 st.markdown("""<style>.stApp { background-color: #ffffff; color: #333333; } div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; } div.stButton > button:first-child:hover { background-color: #59ea63; color: black; transition: 0.3s; } .stTextArea textarea { background-color: #f8f9fa; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px; }</style>""", unsafe_allow_html=True)
 
-# 3. CONEXÃO ESTÁVEL (FIX ERRO 404/NOTFOUND)
+# 3. CONEXÃO ESTÁVEL (FIX 404)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # Busca dinâmica do modelo para evitar erro de versão
-    model_name = 'gemini-1.5-flash-latest' 
-    model = genai.GenerativeModel(model_name)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"Erro Crítico de Inicialização: {e}"); st.stop()
+    st.error(f"Erro de Inicialização: {e}"); st.stop()
 
-# SIDEBAR - ASSISTENTE INTELIGENTE (PONTO 5)
+# SIDEBAR - CONCIERGE AUDITIA (HUMANIZADO)
 with st.sidebar:
-    st.header("🤖 Assistente AuditIA")
-    pergunta_suporte = st.text_input("Dúvida rápida sobre o sistema?")
-    if pergunta_suporte:
+    st.header("🤖 Concierge AuditIA")
+    st.write("Olá! Sou seu assistente de suporte. Como posso facilitar sua perícia hoje?")
+    
+    # OPÇÕES DE ESCOLHA RÁPIDA (PONTO 5)
+    opcao = st.selectbox("Selecione um tópico ou digite abaixo:", 
+                        ["Escolha uma opção...", "Como anexar arquivos?", "O que significam as cores?", "Limite de páginas (PDF)", "Falar com suporte humano"])
+    
+    if opcao == "Como anexar arquivos?":
+        st.info("Basta arrastar seus arquivos (.jpg, .pdf, .eml) para a área central. Eles serão acumulados automaticamente.")
+    elif opcao == "O que significam as cores?":
+        st.info("🔴 Fraude | 🟠 Suspeita | 🟡 Atenção | 🟢 Seguro | 🔵 Informativo")
+    elif opcao == "Limite de páginas (PDF)":
+        st.info("O AuditIA processa PDFs de até 1000 páginas por vez para garantir precisão cirúrgica.")
+    elif opcao == "Falar com suporte humano":
+        st.warning("Dúvida complexa? Envie os detalhes para: auditaiajuda@gmail.com")
+
+    duvida_extra = st.text_input("Ou digite sua dúvida aqui:")
+    if duvida_extra:
         try:
-            prompt_sup = f"Aja como assistente do AuditIA. Responda: {pergunta_suporte}. No final, diga que para casos complexos o usuário pode falar com o perito no link: https://wa.me/5511913556631"
-            res_sup = model.generate_content(prompt_sup)
-            st.info(res_sup.text)
-        except: st.write("Para suporte avançado: [Clique aqui](https://wa.me/5511913556631)")
+            prompt_ajuda = f"Aja como um atendente humanizado do AuditIA. Conhecimento: Semáforo de cores, e-Discovery, Auditoria de Imagem, Suporte PST. Dúvida: {duvida_extra}. Se não souber, peça para enviar e-mail para auditaiajuda@gmail.com"
+            res_ajuda = model.generate_content(prompt_ajuda)
+            st.write(res_ajuda.text)
+        except: st.write("Por favor, encaminhe sua dúvida para auditaiajuda@gmail.com")
+    
     st.markdown("---")
-    st.caption("AuditIA V22 - Vargem Grande do Sul - SP")
+    st.caption("AuditIA V23 - Vargem Grande do Sul - SP")
 
 # 4. CABEÇALHO
 try:
@@ -71,44 +85,34 @@ if new_files:
             st.session_state.arquivos_acumulados.append({'name': f.name, 'content': f.read(), 'type': f.type})
 
 if st.session_state.arquivos_acumulados:
-    st.write("📦 **Provas Acumuladas para Análise:**")
-    cols = st.columns(min(len(st.session_state.arquivos_acumulados), 5))
+    st.write("📦 **Provas Acumuladas na Sessão:**")
+    cols = st.columns(min(len(st.session_state.arquivos_acumulados), 6))
     for i, f in enumerate(st.session_state.arquivos_acumulados):
-        with cols[i % 5]: st.caption(f"✅ {f['name']}")
+        with cols[i % 6]: st.caption(f"✅ {f['name']}")
 
 st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Analise estes arquivos em conjunto buscando fraudes'...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Analise estes e-mails buscando indícios de fraude'...", height=120)
 
-# FUNÇÃO LAUDO PDF
-def gerar_pdf_pericial(conteudo, data_f):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16); pdf.cell(200, 15, txt="LAUDO TÉCNICO PERICIAL - AUDITIA", ln=True, align='C')
-    pdf.set_font("Arial", size=11); pdf.ln(10)
-    pdf.multi_cell(0, 8, txt=conteudo.encode('latin-1', 'replace').decode('latin-1'))
-    return pdf.output(dest='S').encode('latin-1')
-
-# 6. MOTOR DE AUDITORIA (PONTOS 1, 2 E 3)
+# 6. MOTOR DE AUDITORIA (BLINDADO)
 col_ex, col_limp = st.columns([1, 1])
 with col_ex:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
         pergunta_efetiva = st.session_state.get('pergunta_ativa', '')
         if not pergunta_efetiva and not st.session_state.arquivos_acumulados:
-            st.warning("Insira material.")
+            st.warning("Insira material para análise.")
         else:
             tz_br = pytz.timezone('America/Sao_Paulo'); agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ Realizando auditoria..."):
+            with st.spinner("🕵️ Realizando varredura pericial..."):
                 try:
-                    instrucao = f"""Aja como AuditIA, perito forense. Data: {agora}.
-                    OBRIGATÓRIO: 
-                    1. Inicie com **CLASSIFICAÇÃO: [TIPO]** em negrito e maiúsculas.
+                    instrucao = f"""Aja como AuditIA, perito sênior. Data: {agora}.
+                    REGRAS: 
+                    1. Inicie com **CLASSIFICAÇÃO: [TIPO]** em negrito.
                     2. Logo abaixo: 'PERGUNTA ANALISADA EM {agora}: "{pergunta_efetiva}"'.
-                    3. Analise TODOS os arquivos acumulados em conjunto.
-                    4. Se houver e-mails, foque em texto/cabeçalhos. Se houver imagens, foque em anatomia de IA.
-                    5. Encerre com **RESUMO DO VEREDITO:**."""
+                    3. Se houver e-mails, foque em cabeçalhos/texto. Se imagens, em anatomia de IA.
+                    4. Encerre com **RESUMO DO VEREDITO:**."""
                     
                     contexto = [instrucao]
                     for h in st.session_state.historico_pericial: contexto.append(h)
@@ -117,29 +121,25 @@ with col_ex:
                             msg = email.message_from_bytes(f['content'], policy=policy.default)
                             contexto.append(f"E-MAIL ({f['name']}): {msg.get_body(preferencelist=('plain')).get_content()}")
                         elif f['name'].endswith('.pdf'): contexto.append({"mime_type": "application/pdf", "data": f['content']})
-                        elif f['name'].lower().endswith(('jpg', 'jpeg', 'png')):
-                            contexto.append(Image.open(io.BytesIO(f['content'])))
+                        else: contexto.append(Image.open(io.BytesIO(f['content'])))
                     
                     contexto.append(pergunta_efetiva)
                     response = model.generate_content(contexto)
                     st.session_state.historico_pericial.append(response.text)
                     st.rerun()
-                except Exception as e: st.error(f"Erro na análise: {e}")
+                except Exception as e: st.error(f"Erro técnico: {e}")
 
 with col_limp:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
 
-if st.session_state.historico_pericial:
-    pdf_bytes = gerar_pdf_pericial(st.session_state.historico_pericial[-1], datetime.now().strftime("%d/%m/%Y"))
-    st.download_button(label="📥 Baixar Laudo PDF", data=pdf_bytes, file_name="Laudo_AuditIA.pdf", mime="application/pdf")
-
-# 7. GUIA MESTRE (PONTO 3 - PRESERVADO)
+# 7. GUIA MESTRE (PONTO 3)
 st.markdown("---")
 with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia"):
     st.markdown("""### 🛡️ Inteligência Forense Profissional
     1. **Forense de Imagem**: Anatomia crítica e artefatos de IA.
-    2. **e-Discovery & PST**: Auditoria de massa de e-mails corporativos.
+    2. **e-Discovery & PST**: Auditoria de e-mails em massa.
     3. **Engenharia Social**: Desmascara phishing e manipulação.
-    4. **Consistência Documental**: Auditoria de metadados.
-    5. **Memória Iterativa**: Histórico para follow-up sem perda de contexto.""")
+    4. **Memória Iterativa**: Histórico para follow-up sem perda de contexto.""")
+
+st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
