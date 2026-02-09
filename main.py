@@ -14,7 +14,7 @@ if "historico_pericial" not in st.session_state:
 if "arquivos_acumulados" not in st.session_state:
     st.session_state.arquivos_acumulados = []
 if "chat_suporte" not in st.session_state:
-    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Conheço todos os protocolos: links, documentos, e-discovery e IA. O que vamos auditar hoje?"}]
+    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Conheço todos os protocolos de auditoria do sistema. O que vamos investigar agora?"}]
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
@@ -25,13 +25,13 @@ st.set_page_config(page_title="AuditIA - Supreme Forensic Intelligence", page_ic
 # 2. TERMÔMETRO DE CORES BLINDADO (PONTO 1)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
-    if any(term in texto_upper for term in ["FRAUDE CONFIRMADA", "GOLPE", "FAKE", "SCAM"]): 
+    if any(term in texto_upper for term in ["FRAUDE CONFIRMADA", "GOLPE", "FAKE", "SCAM", "CRIME"]): 
         cor, font = "#ff4b4b", "white" # VERMELHO
-    elif any(term in texto_upper for term in ["ALTA ATENÇÃO", "MUITA ATENÇÃO", "PHISHING"]): 
+    elif any(term in texto_upper for term in ["ALTA ATENÇÃO", "MUITA ATENÇÃO", "PHISHING", "ALTAMENTE SUSPEITO"]): 
         cor, font = "#ffa500", "white" # LARANJA
     elif "ATENÇÃO" in texto_upper: 
         cor, font = "#f1c40f", "black" # AMARELO
-    elif "SEGURO" in texto_upper or "TUDO OK" in texto_upper: 
+    elif any(term in texto_upper for term in ["SEGURO", "TUDO OK", "INTEGRIDADE CONFIRMADA"]): 
         cor, font = "#2ecc71", "white" # VERDE
     else: 
         cor, font = "#3498db", "white" # AZUL (NEUTRO)
@@ -45,13 +45,19 @@ def aplicar_estilo_pericial(texto):
 
 st.markdown("""<style>.stApp { background-color: #ffffff; color: #333333; } div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; }</style>""", unsafe_allow_html=True)
 
-# 3. CONEXÃO ESTÁVEL (FIX DEFINITIVO 404 E CAIXA ROSA)
-try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # Nome universal do modelo para evitar conflito de versão
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except Exception as e:
-    st.error("Servidor pericial em manutenção ou API instável. Aguarde 60 segundos."); st.stop()
+# 3. CONEXÃO ULTRA-RESILIENTE (FIM DO 404 E CAIXA ROSA)
+def carregar_modelo():
+    try:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        # Busca dinâmica do modelo ativo na conta para evitar NotFound
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                return genai.GenerativeModel(m.name)
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except:
+        return None
+
+model = carregar_modelo()
 
 # 4. CABEÇALHO
 try:
@@ -60,7 +66,7 @@ except: st.title("👁️ AuditIA")
 
 st.markdown("---")
 
-# 5. INGESTÃO CUMULATIVA (DRAG AND DROP - PONTO 4)
+# 5. INGESTÃO CUMULATIVA (PONTO 4)
 new_files = st.file_uploader("📂 Arraste seus documentos, imagens ou e-mails aqui ou clique para fazer o upload:", 
                                type=["jpg", "png", "jpeg", "pdf", "eml", "pst"], accept_multiple_files=True)
 
@@ -70,7 +76,7 @@ if new_files:
             st.session_state.arquivos_acumulados.append({'name': f.name, 'content': f.read(), 'type': f.type})
 
 if st.session_state.arquivos_acumulados:
-    st.write("📦 **Provas Acumuladas na Investigação:**")
+    st.write("📦 **Mesa de Perícia (Provas Acumuladas):**")
     cols = st.columns(min(len(st.session_state.arquivos_acumulados), 6))
     for i, f in enumerate(st.session_state.arquivos_acumulados):
         with cols[i % 6]: st.caption(f"✅ {f['name']}")
@@ -81,21 +87,22 @@ for bloco in st.session_state.historico_pericial:
 
 user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Sua dúvida técnica ou busca e-discovery aqui...", height=120)
 
-# 6. MOTOR DE AUDITORIA (BLINDAGEM TOTAL - PONTO 2)
+# 6. MOTOR DE AUDITORIA (CONSOLIDADO E PROTEGIDO)
 col_ex, col_limp = st.columns([1, 1])
 with col_ex:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
+        if not model: st.error("Servidor pericial indisponível momentaneamente."); st.stop()
         pergunta_efetiva = st.session_state.get('pergunta_ativa', '')
         if not pergunta_efetiva and not st.session_state.arquivos_acumulados:
             st.warning("Insira material para análise.")
         else:
             tz_br = pytz.timezone('America/Sao_Paulo'); agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ AuditIA realizando varredura forense..."):
+            with st.spinner("🕵️ Realizando varredura forense..."):
                 try:
                     instrucao = f"""Aja como AuditIA, inteligência forense sênior. Hoje: {agora}.
                     1. Inicie com **CLASSIFICAÇÃO: [TIPO EM MAIÚSCULAS]** em negrito.
-                    2. Use os tipos: FRAUDE CONFIRMADA, ALTA ATENÇÃO, ATENÇÃO, SEGURO ou INFORMATIVO.
-                    3. Analise links, cabeçalhos de e-mail e metadados de documentos.
+                    2. Use o termômetro: FRAUDE CONFIRMADA, ALTA ATENÇÃO, ATENÇÃO, SEGURO ou INFORMATIVO.
+                    3. Se detectar links forjados ou phishing, use ALTA ATENÇÃO ou FRAUDE CONFIRMADA.
                     4. Encerre com **RESUMO DO VEREDITO:**."""
                     
                     contexto = [instrucao]
@@ -111,38 +118,36 @@ with col_ex:
                     response = model.generate_content(contexto)
                     st.session_state.historico_pericial.append(response.text)
                     st.rerun()
-                except Exception as e:
-                    st.error("Erro na análise. Verifique sua conexão ou volume de dados."); print(f"Erro: {e}")
+                except: st.error("Instabilidade na análise. Por favor, tente novamente.")
 
 with col_limp:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
 
-# 7. CONCIERGE "SUPREME" (PONTO 5 - HUMANIZADO E RESPONSIVO)
+# 7. CONCIERGE "SPECIALIST" (PONTO 5 - HUMANIZADO E RESPONSIVO)
 st.markdown("---")
 with st.container():
-    st.subheader("💬 Concierge AuditIA - Suporte Especializado")
+    st.subheader("💬 Atendimento Especializado AuditIA")
     for msg in st.session_state.chat_suporte:
         with st.chat_message(msg["role"]): st.write(msg["content"])
     
-    if prompt_suporte := st.chat_input("Dúvida técnica sobre links, documentos ou limites?"):
+    if prompt_suporte := st.chat_input("Dúvida técnica sobre limites, auditoria de links ou arquivos?"):
+        if not model: st.error("Concierge offline. Verifique a API."); st.stop()
         st.session_state.chat_suporte.append({"role": "user", "content": prompt_suporte})
         with st.chat_message("user"): st.write(prompt_suporte)
         with st.chat_message("assistant"):
             knowledge = """
-            Você é o Concierge AuditIA. Você detém TODO o conhecimento técnico do sistema:
-            - Links: Auditamos phishing, domínios falsos e redirecionamentos maliciosos.
-            - Documentos: Verificamos veracidade via metadados (EXIF), consistência de fontes e selos digitais.
-            - Limites: Você pode anexar até 5 arquivos simultâneos. Cada arquivo pode ter até 200MB.
-            - E-mails: Analisamos cabeçalhos (SPF/DKIM/DMARC) e conteúdo em .eml e .pst.
-            - Fotos: Detecção de IA via anatomia, luz e textura.
-            - REGRA: Se não entender a dúvida, questione o usuário para esclarecer. Não seja genérico.
-            - Responda SEMPRE na primeira linha. Use auditaiajuda@gmail.com apenas para erros fatais ou questões comerciais.
+            Você é o Concierge AuditIA. Seja acolhedor e técnico.
+            CONHECIMENTOS:
+            - Auditoria de Links: Buscamos phishing, redirecionamentos e domínios maliciosos.
+            - Verificação de Documentos: Analisamos metadados, consistência de fontes e selos digitais.
+            - e-Discovery: Processamos arquivos .eml e .pst.
+            - Limites: Até 5 arquivos simultâneos de 200MB cada.
+            - REGRA: Se a dúvida for vaga, pergunte ao usuário para entender melhor. 
+            - Responda SEMPRE na primeira linha. E-mail de suporte: auditaiajuda@gmail.com.
             """
             try:
                 res_sup = model.generate_content(knowledge + prompt_suporte)
                 st.write(res_sup.text)
                 st.session_state.chat_suporte.append({"role": "assistant", "content": res_sup.text})
-            except: st.write("Tive uma falha momentânea. Encaminhe sua dúvida para auditaiajuda@gmail.com")
-
-st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
+            except: st.write("Tive uma falha. Envie para auditaiajuda@gmail.com")
