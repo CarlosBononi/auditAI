@@ -14,7 +14,7 @@ if "historico_pericial" not in st.session_state:
 if "arquivos_acumulados" not in st.session_state:
     st.session_state.arquivos_acumulados = []
 if "chat_suporte" not in st.session_state:
-    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. O que você precisa saber agora? Seja direto."}]
+    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Sou expert em auditoria de links, verificação de documentos e e-discovery. Como posso ser útil?"}]
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
@@ -22,7 +22,7 @@ def processar_pericia():
 
 st.set_page_config(page_title="AuditIA - Inteligência Forense Elite", page_icon="👁️", layout="wide")
 
-# 2. SEMÁFORO DE CORES COM SENSIBILIDADE MÁXIMA
+# 2. SEMÁFORO DE CORES COM SENSIBILIDADE MÁXIMA (PONTO 1)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     if any(term in texto_upper for term in ["FRAUDE CONFIRMADA", "PHISHING", "SCAM", "GOLPE", "FAKE"]):
@@ -43,8 +43,7 @@ st.markdown("""<style>.stApp { background-color: #ffffff; color: #333333; } div.
 # 3. CONEXÃO ESTÁVEL
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    modelos_disp = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    model = genai.GenerativeModel(modelos_disp[0] if modelos_disp else 'gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except:
     st.error("Erro de conexão. Tente novamente."); st.stop()
 
@@ -55,7 +54,7 @@ except: st.title("👁️ AuditIA")
 
 st.markdown("---")
 
-# 5. INGESTÃO CUMULATIVA (DRAG AND DROP)
+# 5. INGESTÃO CUMULATIVA (DRAG AND DROP - PONTO 4)
 new_files = st.file_uploader("📂 Arraste seus documentos, imagens ou e-mails aqui ou clique para fazer o upload:", 
                                type=["jpg", "png", "jpeg", "pdf", "eml", "pst"], accept_multiple_files=True)
 
@@ -65,7 +64,7 @@ if new_files:
             st.session_state.arquivos_acumulados.append({'name': f.name, 'content': f.read(), 'type': f.type})
 
 if st.session_state.arquivos_acumulados:
-    st.write("📦 **Provas Acumuladas:**")
+    st.write("📦 **Provas Acumuladas na Investigação:**")
     cols = st.columns(min(len(st.session_state.arquivos_acumulados), 6))
     for i, f in enumerate(st.session_state.arquivos_acumulados):
         with cols[i % 6]: st.caption(f"✅ {f['name']}")
@@ -74,7 +73,7 @@ st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Analise os e-mails e a foto em conjunto buscando por fraude'...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Sua dúvida técnica ou busca e-discovery aqui...", height=120)
 
 # FUNÇÃO LAUDO PDF
 def gerar_pdf_pericial(conteudo, data_f):
@@ -85,7 +84,7 @@ def gerar_pdf_pericial(conteudo, data_f):
     pdf.multi_cell(0, 8, txt=conteudo.encode('latin-1', 'replace').decode('latin-1'))
     return pdf.output(dest='S').encode('latin-1')
 
-# 6. MOTOR DE AUDITORIA (BLINDAGEM V29)
+# 6. MOTOR DE AUDITORIA (BLINDAGEM V30 - PONTO 2)
 col_ex, col_limp = st.columns([1, 1])
 with col_ex:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
@@ -94,12 +93,12 @@ with col_ex:
             st.warning("Insira material para análise.")
         else:
             tz_br = pytz.timezone('America/Sao_Paulo'); agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ AuditIA realizando auditoria forense..."):
+            with st.spinner("🕵️ AuditIA realizando varredura forense..."):
                 try:
-                    instrucao = f"""Aja como AuditIA. Hoje: {agora}.
-                    1. Inicie com **CLASSIFICAÇÃO: [TIPO]** em negrito e maiúsculas.
-                    2. Responda diretamente e tecnicamente.
-                    3. Termine com **RESUMO DO VEREDITO:**."""
+                    instrucao = f"""Aja como AuditIA, inteligência forense sênior. Hoje: {agora}.
+                    1. Inicie com **CLASSIFICAÇÃO: [TIPO EM MAIÚSCULAS]** em negrito.
+                    2. Diagnóstico técnico direto e profundo.
+                    3. Encerre com **RESUMO DO VEREDITO:**."""
                     
                     contexto = [instrucao]
                     for h in st.session_state.historico_pericial: contexto.append(h)
@@ -120,23 +119,32 @@ with col_limp:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
 
-# 7. CONCIERGE "DIRECT" (HUMANIZADO E OBJETIVO)
+# 7. CONCIERGE "SPECIALIST"Widget Flutuante (PONTO 5)
 st.markdown("---")
 with st.container():
-    st.subheader("💬 Concierge AuditIA")
+    st.subheader("💬 Atendimento Especializado AuditIA")
     for msg in st.session_state.chat_suporte:
         with st.chat_message(msg["role"]): st.write(msg["content"])
     
-    if prompt_suporte := st.chat_input("Como posso ajudar de forma direta?"):
+    if prompt_suporte := st.chat_input("Dúvida técnica sobre links, documentos ou arquivos?"):
         st.session_state.chat_suporte.append({"role": "user", "content": prompt_suporte})
         with st.chat_message("user"): st.write(prompt_suporte)
         with st.chat_message("assistant"):
-            # NOVA DIRETRIZ: Resposta direta na primeira linha.
-            knowledge = "Aja como o Concierge AuditIA. RESPONDA O QUE FOI PERGUNTADO NA PRIMEIRA LINHA DE FORMA OBJETIVA. Não repita o manual inteiro. Limite-se a responder a dúvida. Se não souber, indique auditaiajuda@gmail.com."
+            knowledge = """
+            Você é o Concierge AuditIA. Seja humanizado e direto.
+            CONHECIMENTO TÉCNICO OBRIGATÓRIO:
+            - Auditamos links: Buscamos phishing, domínios falsos e redirecionamentos maliciosos.
+            - Documentos Reais: Verificamos metadados (EXIF, Autor), consistência de fontes e selos digitais.
+            - Limites: Upload de até 200MB por arquivo. Aceitamos múltiplos arquivos simultâneos.
+            - E-mails: Analisamos cabeçalhos (SPF/DKIM/DMARC) em .eml e .pst.
+            - Fotos: Detecção de IA via anatomia e textura.
+            - Responda SEMPRE a dúvida na primeira linha.
+            - Use auditaiajuda@gmail.com apenas como último recurso.
+            """
             try:
                 res_sup = model.generate_content(knowledge + prompt_suporte)
                 st.write(res_sup.text)
                 st.session_state.chat_suporte.append({"role": "assistant", "content": res_sup.text})
-            except: st.write("Tive uma falha. Envie sua dúvida para auditaiajuda@gmail.com")
+            except: st.write("Envie sua dúvida para auditaiajuda@gmail.com")
 
 st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
