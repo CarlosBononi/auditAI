@@ -35,7 +35,6 @@ st.set_page_config(
 # 3. TERMÔMETRO DE CLASSIFICAÇÃO
 # ==============================
 def aplicar_estilo_pericial(texto: str) -> str:
-    """Aplica estilo visual ao resultado pericial baseado em palavras-chave."""
     texto_upper = texto.upper()
     if any(term in texto_upper for term in ["SEGURO", "TUDO OK", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO"]):
         cor, font = "#2ecc71", "white"  # VERDE
@@ -71,11 +70,17 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==============================
-# 5. CONEXÃO COM GEMINI
+# 5. CONEXÃO COM GEMINI (DINÂMICA)
 # ==============================
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    available_models = [m for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
+    if available_models:
+        model_name = available_models[0].name  # pega o primeiro modelo válido
+        model = genai.GenerativeModel(model_name)
+    else:
+        st.error("Nenhum modelo disponível para generateContent.")
+        st.stop()
 except Exception as e:
     st.error(f"Erro na conexão com servidor Gemini: {e}")
     st.stop()
@@ -204,8 +209,8 @@ with st.expander("📖 Central de Ajuda AuditIA - Conhecimento Técnico e FAQ"):
 
     with tab1:
         st.markdown("""
-               ### 🧬 A Missão AuditIA
-        O AuditIA foi concebido para unir a psicologia forense à tecnologia de ponta.  
+        ### 🧬 A Missão AuditIA
+        Nascido em **Vargem Grande do Sul - SP**, o AuditIA foi concebido para unir a psicologia forense à tecnologia de ponta.  
         O projeto surgiu da necessidade de identificar micro-anomalias em comunicações digitais que fogem ao olho humano.
 
         **Nossos 7 Pilares de Investigação:**
@@ -249,4 +254,4 @@ with st.expander("📖 Central de Ajuda AuditIA - Conhecimento Técnico e FAQ"):
 # ==============================
 # 12. RODAPÉ
 # ==============================
-st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital | VGS - SP")
+st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital")
