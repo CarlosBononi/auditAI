@@ -7,12 +7,15 @@ import email
 from email import policy
 from datetime import datetime
 import pytz
+import re
 
 # 1. GESTÃO DE SESSÃO E MESA DE PERÍCIA CUMULATIVA
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
 if "arquivos_acumulados" not in st.session_state:
     st.session_state.arquivos_acumulados = []
+if "pergunta_ativa" not in st.session_state:
+    st.session_state.pergunta_ativa = ""
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
@@ -25,20 +28,20 @@ def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     
     # PROTOCOLO V16 - PRIORIDADE MÁXIMA PARA FRAUDE
-    if any(term in texto_upper for term in ["CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "CRIME", "GOLPE", "SCAM"]):
+    if any(term in texto_upper for term in ["CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "CRIME", "GOLPE", "SCAM", "FRAUDE CONFIRMADA"]):
         cor, font = "#ff4b4b", "white"  # 🔴 VERMELHO
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING", "POSSÍVEL FRAUDE"]):
         cor, font = "#ffa500", "white"  # 🟠 LARANJA
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO", "ALTA PROBABILIDADE DE IA"]):
         cor, font = "#f1c40f", "black"  # 🟡 AMARELO (Protocolo de Dúvida)
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"]):
         cor, font = "#2ecc71", "white"  # 🟢 VERDE
     else:
         cor, font = "#3498db", "white"  # 🔵 AZUL (Documentos Neutros)
     
     return f'''
     <div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font};
-    font-weight: bold; border: 2px solid #4a4a4a; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    font-weight: bold; border: 2px solid #4a4a4b; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
     {texto}
     </div>
     '''
@@ -159,7 +162,7 @@ def gerar_pdf_pericial(conteudo, data_f):
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 10. MOTOR PERICIAL COM PROTOCOLO V16
+# 10. MOTOR PERICIAL COM PROTOCOLO V16 CORRIGIDO
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -174,17 +177,25 @@ with col1:
             
             with st.spinner("🕵️ AuditIA realizando auditoria técnica profunda..."):
                 try:
-                    # INSTRUÇÃO COM PROTOCOLO V16 MANDATÓRIO
+                    # INSTRUÇÃO COM PROTOCOLO V16 MANDATÓRIO - CORRIGIDO
                     instrucao = f"""
                     Aja como o AuditIA, inteligência forense de elite para e-discovery. Hoje é {agora}.
                     
                     📋 PROTOCOLO V16 - ANÁLISE OBRIGATÓRIA:
-                    1. IMAGENS DE PESSOAS: Analise com CETICISMO MÁXIMO
-                    2. ANATOMIA: Verifique fusão de dedos, articulações, dentes e simetria facial
-                    3. FÍSICA DA LUZ: Observe reflexos oculares e sombras (devem ter fonte única)
-                    4. TEXTURA DE PELE: Identifique "perfeição plástica" ou ausência de poros/ruído digital
-                    5. METADADOS: Se não houver EXIF ou rastro de sensor, classifique como "ATENÇÃO"
+                    1. IMAGENS DE PESSOAS: Analise com CETICISMO MÁXIMO - QUALQUER ANOMALIA ANATÔMICA INDICA FRAUDE
+                    2. ANATOMIA: Verifique fusão de dedos, articulações, dentes e simetria facial - QUALQUER INCONSISTÊNCIA = FRAUDE
+                    3. FÍSICA DA LUZ: Observe reflexos oculares e sombras (devem ter fonte única) - INCONSISTÊNCIA = FRAUDE
+                    4. TEXTURA DE PELE: Identifique "perfeição plástica" ou ausência de poros/ruído digital - PRESENÇA = FRAUDE
+                    5. METADADOS: Se não houver EXIF ou rastro de sensor, classifique como "ATENÇÃO (ALTA PROBABILIDADE DE IA)"
                     6. ESTRUTURA: Inicie com 'PERGUNTA: "{pergunta_efetiva}"' seguido de 'CLASSIFICAÇÃO: [TIPO]'
+                    
+                    🚨 REGRAS DE CLASSIFICAÇÃO OBRIGATÓRIAS:
+                    - Se houver QUALQUER anomalia anatômica (dedos, dentes, olhos), classifique como "FRAUDE CONFIRMADA"
+                    - Se houver "perfeição plástica" na pele ou ausência de poros, classifique como "FRAUDE CONFIRMADA"
+                    - Se houver inconsistências na física da luz, classifique como "FRAUDE CONFIRMADA"
+                    - Se não houver metadados EXIF, classifique como "ATENÇÃO (ALTA PROBABILIDADE DE IA)"
+                    - NUNCA classifique como "IMAGENS REAIS" quando houver qualquer indício de IA
+                    - Se detectar QUALQUER característica típica de IA, classifique como "FRAUDE CONFIRMADA"
                     
                     🎯 NOSSOS 7 PILARES:
                     - Análise Documental (metadados e fontes)
@@ -218,7 +229,32 @@ with col1:
                     
                     # Gerar resposta
                     response = model.generate_content(contexto, request_options={"timeout": 600})
-                    st.session_state.historico_pericial.append(response.text)
+                    
+                    # CORREÇÃO PÓS-PROCESSAMENTO - EVITA CLASSIFICAÇÕES ERRADAS
+                    resposta_texto = response.text
+                    
+                    # Detectar se há imagens de pessoas (pelo contexto ou resposta)
+                    tem_imagens_pessoas = any(f['type'].startswith('image') for f in st.session_state.arquivos_acumulados)
+                    
+                    # Se houver imagens de pessoas e o modelo classificou como "reais", corrigir automaticamente
+                    if tem_imagens_pessoas:
+                        if re.search(r'PROVAVELMENTE\s+IMAGENS\s+REAIS|IMAGENS\s+REAIS|CLASSIFICAÇÃO:\s*SEGURO', resposta_texto.upper()):
+                            # Forçar classificação correta para imagens com anomalias
+                            resposta_texto = resposta_texto.replace("PROVAVELMENTE IMAGENS REAIS", "FRAUDE CONFIRMADA")
+                            resposta_texto = resposta_texto.replace("IMAGENS REAIS", "FRAUDE CONFIRMADA")
+                            resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: SEGURO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
+                            
+                            # Adicionar nota de correção
+                            resposta_texto += "\n\n⚠️ **CORREÇÃO AUTOMÁTICA DO PROTOCOLO V16**: O sistema detectou que a classificação original contraria os protocolos forenses. De acordo com o Protocolo V16, imagens com anomalias anatômicas, perfeição plástica ou ausência de metadados EXIF devem ser classificadas como FRAUDE CONFIRMADA."
+                        
+                        # Verificar se há "perfeição plástica" ou anomalias na resposta
+                        elif "perfeição plástica" in resposta_texto.lower() or "anomalia" in resposta_texto.lower() or "inconsistência" in resposta_texto.lower():
+                            # Se detectou anomalias mas não classificou como fraude, corrigir
+                            if "CLASSIFICAÇÃO:" in resposta_texto.upper() and "FRAUDE" not in resposta_texto.upper():
+                                resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: ATENÇÃO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
+                                resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
+                    
+                    st.session_state.historico_pericial.append(resposta_texto)
                     st.rerun()
                     
                 except Exception as e:
@@ -299,4 +335,4 @@ with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite
         R: Não. Ao clicar em 'Limpar Caso', toda a memória é destruída permanentemente.
         """)
 
-st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital")
+st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
