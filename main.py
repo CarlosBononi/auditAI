@@ -163,50 +163,50 @@ if st.session_state.aceitou_termo:
         height=120
     )
 
-    # ==============================
+      # ==============================
     # 11. BOTÕES DE AÇÃO
     # ==============================
     col1, col2 = st.columns([1, 1])
-   with col1:
-    if st.button("🚀 EXECUTAR PERÍCIA"):
-        if not user_query and not st.session_state.arquivos_acumulados:
-            st.warning("Insira material.")
-        else:
-            tz_br = pytz.timezone('America/Sao_Paulo')
-            agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ Realizando auditoria técnica profunda..."):
-                try:
-                    instrucao = (
-                        "Aja como AuditIA, perito forense sênior. "
-                        "Inicie com **CLASSIFICAÇÃO: [TIPO]**. "
-                        "Se for legítimo, use 'CLASSIFICAÇÃO: SEGURO'."
-                    )
-                    contexto = [instrucao]
-                    contexto.extend(st.session_state.historico_pericial)
+    with col1:
+        if st.button("🚀 EXECUTAR PERÍCIA"):
+            if not user_query and not st.session_state.arquivos_acumulados:
+                st.warning("Insira material.")
+            else:
+                tz_br = pytz.timezone('America/Sao_Paulo')
+                agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
+                with st.spinner("🕵️ Realizando auditoria técnica profunda..."):
+                    try:
+                        instrucao = (
+                            "Aja como AuditIA, perito forense sênior. "
+                            "Inicie com **CLASSIFICAÇÃO: [TIPO]**. "
+                            "Se for legítimo, use 'CLASSIFICAÇÃO: SEGURO'."
+                        )
+                        contexto = [instrucao]
+                        contexto.extend(st.session_state.historico_pericial)
 
-                    for f in st.session_state.arquivos_acumulados:
-                        if f['name'].endswith('.eml'):
-                            msg = email.message_from_bytes(f['content'], policy=policy.default)
-                            corpo_email = msg.get_body(preferencelist=('plain'))
-                            if corpo_email:
-                                contexto.append(f"E-MAIL: {corpo_email.get_content()}")
-                        elif f['type'] == "application/pdf":
-                            contexto.append({"mime_type": "application/pdf", "data": f['content']})
+                        for f in st.session_state.arquivos_acumulados:
+                            if f['name'].endswith('.eml'):
+                                msg = email.message_from_bytes(f['content'], policy=policy.default)
+                                corpo_email = msg.get_body(preferencelist=('plain'))
+                                if corpo_email:
+                                    contexto.append(f"E-MAIL: {corpo_email.get_content()}")
+                            elif f['type'] == "application/pdf":
+                                contexto.append({"mime_type": "application/pdf", "data": f['content']})
+                            else:
+                                contexto.append(Image.open(io.BytesIO(f['content'])).convert('RGB'))
+
+                        if st.session_state.pergunta_ativa:
+                            contexto.append(st.session_state.pergunta_ativa)
+
+                        response = model.generate_content(contexto, request_options={"timeout": 600})
+                        if response and hasattr(response, "text"):
+                            st.session_state.historico_pericial.append(response.text)
                         else:
-                            contexto.append(Image.open(io.BytesIO(f['content'])).convert('RGB'))
+                            st.error("Resposta inválida do modelo.")
+                        st.rerun()
 
-                    if st.session_state.pergunta_ativa:
-                        contexto.append(st.session_state.pergunta_ativa)
-
-                    response = model.generate_content(contexto, request_options={"timeout": 600})
-                    if response and hasattr(response, "text"):
-                        st.session_state.historico_pericial.append(response.text)
-                    else:
-                        st.error("Resposta inválida do modelo.")
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Erro de instabilidade: {e}")
+                    except Exception as e:
+                        st.error(f"Erro de instabilidade: {e}")
 
     with col2:
         if st.button("🗑️ LIMPAR CASO"):
@@ -270,4 +270,3 @@ with st.expander("📖 Central de Ajuda AuditIA - Conhecimento Técnico e FAQ"):
 # 13. RODAPÉ
 # ==============================
 st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital | VGS - SP")
-
