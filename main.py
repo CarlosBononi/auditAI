@@ -15,23 +15,23 @@ if "historico_pericial" not in st.session_state:
 if "arquivos_acumulados" not in st.session_state:
     st.session_state.arquivos_acumulados = []
 if "chat_suporte" not in st.session_state:
-    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Conheço todos os protocolos de auditoria do sistema. O que vamos investigar hoje?"}]
+    st.session_state.chat_suporte = [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Conheço todos os protocolos de auditoria (Phishing, Documentos, IA). O que vamos investigar hoje?"}]
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
     st.session_state.campo_pergunta = "" 
 
-st.set_page_config(page_title="AuditIA - Supreme Forensic Lock", page_icon="👁️", layout="wide")
+st.set_page_config(page_title="AuditIA - Supreme Forensic Intelligence", page_icon="👁️", layout="wide")
 
 # 2. TERMÔMETRO DE CORES COM HIERARQUIA DE PRIORIDADE (PONTO 1)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
-    # PRIORIDADE 1: VERDE (Veredito positivo é soberano)
-    if any(term in texto_upper for term in ["SEGURO", "TUDO OK", "INTEGRIDADE CONFIRMADA"]):
+    # PRIORIDADE 1: VERDE (Se o veredito for seguro, ignora outros termos de alerta no texto)
+    if any(term in texto_upper for term in ["SEGURO", "TUDO OK", "INTEGRIDADE CONFIRMADA", "VEREDITO: VERDE"]):
         cor, font = "#2ecc71", "white" 
     elif any(term in texto_upper for term in ["FRAUDE CONFIRMADA", "GOLPE", "FAKE", "SCAM"]):
         cor, font = "#ff4b4b", "white" 
-    elif any(term in texto_upper for term in ["ALTA ATENÇÃO", "MUITA ATENÇÃO", "PHISHING"]):
+    elif any(term in texto_upper for term in ["ALTA ATENÇÃO", "MUITA ATENÇÃO", "PHISHING", "ALTAMENTE SUSPEITO"]):
         cor, font = "#ffa500", "white" 
     elif "ATENÇÃO" in texto_upper:
         cor, font = "#f1c40f", "black" 
@@ -47,14 +47,20 @@ def aplicar_estilo_pericial(texto):
 
 st.markdown("""<style>.stApp { background-color: #ffffff; color: #333333; } div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 10px; }</style>""", unsafe_allow_html=True)
 
-# 3. MOTOR DE CONEXÃO AUTO-CICATRIZANTE (FIX DEFINITIVO 404/TIMEOUT)
-try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("AuditIA em sincronização com o servidor forense. Aguarde 60 segundos."); st.stop()
+# 3. MOTOR DE CONEXÃO ULTRA-RESILIENTE (FIX DEFINITIVO 404 E TIMEOUT)
+def inicializar_motor():
+    try:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        # Busca dinâmica do modelo para evitar erro 404
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        model_name = available_models[0] if available_models else 'gemini-1.5-flash'
+        return genai.GenerativeModel(model_name)
+    except:
+        return None
 
-# 4. CABEÇALHO (BRANDING VARGEM GRANDE DO SUL - SP)
+model = inicializar_motor()
+
+# 4. CABEÇALHO (BRANDING CARLOS BONONI)
 try:
     st.image(Image.open("Logo_AI_1.png"), width=500)
 except: st.title("👁️ AuditIA")
@@ -82,10 +88,11 @@ for bloco in st.session_state.historico_pericial:
 
 user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Sua dúvida técnica ou busca e-discovery aqui...", height=120)
 
-# 6. MOTOR DE AUDITORIA COM PROTOCOLO DE RETENTATIVA (FIX OSCILAÇÃO)
+# 6. MOTOR DE AUDITORIA COM RETENTATIVA (FIX OSCILAÇÃO)
 col_ex, col_limp = st.columns([1, 1])
 with col_ex:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
+        if not model: st.error("Servidor em sincronização. Tente novamente em 60s."); st.stop()
         pergunta_efetiva = st.session_state.get('pergunta_ativa', '')
         if not pergunta_efetiva and not st.session_state.arquivos_acumulados:
             st.warning("Insira material para análise.")
@@ -94,10 +101,10 @@ with col_ex:
             with st.spinner("🕵️ Realizando varredura forense multilinear..."):
                 for tentativa in range(3): # PROTOCOLO DE RETENTATIVA
                     try:
-                        instrucao = f"""Aja como AuditIA, perito forense sênior. Hoje: {agora}.
+                        instrucao = f"""Aja como AuditIA, perito sênior. Hoje: {agora}.
                         1. Inicie com **CLASSIFICAÇÃO: [TIPO EM MAIÚSCULAS]** em negrito.
-                        2. Tipos: SEGURO, FRAUDE CONFIRMADA, ALTA ATENÇÃO, ATENÇÃO ou INFORMATIVO.
-                        3. Se for legítimo, use 'CLASSIFICAÇÃO: SEGURO'.
+                        2. Se for legítimo, use 'CLASSIFICAÇÃO: SEGURO'.
+                        3. Responda diretamente e tecnicamente sobre metadados, links e anatomia.
                         4. Encerre com **RESUMO DO VEREDITO:**."""
                         
                         contexto = [instrucao]
@@ -114,43 +121,44 @@ with col_ex:
                         st.session_state.historico_pericial.append(response.text)
                         st.rerun()
                         break
-                    except Exception as e:
+                    except:
                         if tentativa < 2: time.sleep(2)
-                        else: st.error("Instabilidade momentânea no servidor pericial. Por favor, tente novamente em instantes.")
+                        else: st.error("Instabilidade momentânea no servidor pericial. Tente novamente em instantes.")
 
 with col_limp:
     if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
 
-# 7. CONCIERGE "SPECIALIST" (PONTO 5 - HUMANIZADO E RESPONSIVO)
+# 7. CONCIERGE "HUMANIZED EXPERT" (PONTO 5 - HUMANIZADO E RESPONSIVO)
 st.markdown("---")
 with st.container():
     st.subheader("💬 Concierge AuditIA - Suporte Humanizado")
     for msg in st.session_state.chat_suporte:
         with st.chat_message(msg["role"]): st.write(msg["content"])
     
-    if prompt_suporte := st.chat_input("Dúvida técnica sobre limites, precisão ou como funciona?"):
+    # OPÇÕES DE MÚLTIPLA ESCOLHA (PONTO 5)
+    st.write("Dúvidas frequentes:")
+    col_a, col_b, col_c = st.columns(3)
+    if col_a.button("Média de Precisão"): st.info("Analisamos 12 marcadores anatômicos, metadados SPF/DKIM e selos digitais. A precisão é probabilística e de alta fidelidade forense.")
+    if col_b.button("Limites do Robô"): st.info("Você pode anexar até 5 arquivos simultâneos. O limite individual é de 200MB (total de 1GB por sessão).")
+    if col_c.button("Auditoria de Links"): st.info("Auditamos domínios falsos, redirecionamentos maliciosos e phishing em tempo real.")
+    
+    if prompt_suporte := st.chat_input("Ou detalhe sua dúvida técnica aqui:"):
         st.session_state.chat_suporte.append({"role": "user", "content": prompt_suporte})
         with st.chat_message("user"): st.write(prompt_suporte)
         with st.chat_message("assistant"):
-            # Lógica de resposta consultiva (Zero "Seco")
             knowledge = """
-            Você é o Concierge AuditIA, um assistente técnico e humanizado.
-            REGRAS DE OURO:
-            - Nunca responda de forma 'seca' ou mande para e-mail na primeira linha.
-            - Precisão: Analisamos SPF/DKIM para e-mails e 12 marcadores anatômicos e de textura para IA. A precisão é probabilística e de alta fidelidade.
-            - Limites: Você pode anexar até 5 arquivos simultâneos (200MB cada - Total 1GB).
-            - Auditoria:Links suspeitos, Documentos (metadados), e-Discovery e Imagens geradas por IA.
-            - Se a dúvida for vaga, apresente as opções de auditoria acima e pergunte como pode ajudar.
-            - E-mail: auditaiajuda@gmail.com (Apenas para laudos complexos ou falhas fatais).
+            Você é o Concierge AuditIA. Seja humanizado, técnico e consultivo.
+            - Nunca responda de forma 'seca' ou mande para e-mail sem antes explicar.
+            - Se a dúvida for vaga, apresente as opções de auditoria e pergunte como pode ajudar.
+            - Explique que o robô audita links, documentos reais vs falsos, e-mails e imagens de IA.
+            - Use auditaiajuda@gmail.com apenas como canal para laudos complexos ou falhas críticas.
+            - Responda SEMPRE na primeira linha.
             """
             try:
                 res_sup = model.generate_content(knowledge + prompt_suporte)
-                resposta = res_sup.text
-            except: 
-                resposta = "Tive uma oscilação na conexão pericial. Gostaria de saber sobre limites de arquivos, precisão do robô ou auditoria de links? Detalhe sua dúvida ou use auditaiajuda@gmail.com."
-            
-            st.write(resposta)
-            st.session_state.chat_suporte.append({"role": "assistant", "content": resposta})
+                st.write(res_sup.text)
+                st.session_state.chat_suporte.append({"role": "assistant", "content": res_sup.text})
+            except: st.write("Tive uma pequena oscilação. Detalhe sua dúvida ou use auditaiajuda@gmail.com.")
 
 st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
