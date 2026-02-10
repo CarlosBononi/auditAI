@@ -64,8 +64,6 @@ def aplicar_estilo_pericial(texto: str) -> str:
 st.markdown("""
     <style>
     .stApp { background-color: #fdfdfd; }
-
-    /* Botões lado a lado */
     div.stButton > button {
         border-radius: 10px;
         font-weight: bold;
@@ -74,20 +72,6 @@ st.markdown("""
         border: none;
         box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         transition: 0.3s;
-    }
-    /* Botão Executar */
-    div.stButton > button[kind="primary"] {
-        background-color: #3498db; color: white;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        background-color: #2ecc71; color: white; opacity: 0.9;
-    }
-    /* Botão Limpar */
-    div.stButton > button[kind="secondary"] {
-        background-color: #e74c3c; color: white;
-    }
-    div.stButton > button[kind="secondary"]:hover {
-        background-color: #c0392b; color: white; opacity: 0.9;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -130,10 +114,7 @@ Ao prosseguir, você declara estar ciente dos riscos e limitações.
 """)
 
 aceite = st.radio("Estou ciente dos termos e desejo continuar:", ["Não", "Sim"])
-if aceite == "Sim":
-    st.session_state.aceitou_termo = True
-else:
-    st.session_state.aceitou_termo = False
+st.session_state.aceitou_termo = (aceite == "Sim")
 
 st.markdown("---")
 
@@ -187,7 +168,7 @@ if st.session_state.aceitou_termo:
     # ==============================
     col1, col2 = st.columns([1, 1])
     with col1:
-        if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia, type="primary"):
+        if st.button("🚀 EXECUTAR PERÍCIA"):
             if not user_query and not st.session_state.arquivos_acumulados:
                 st.warning("Insira material.")
             else:
@@ -205,29 +186,29 @@ if st.session_state.aceitou_termo:
 
                         for f in st.session_state.arquivos_acumulados:
                             if f['name'].endswith('.eml'):
-                                                        msg = email.message_from_bytes(f['content'], policy=policy.default)
-                        corpo_email = msg.get_body(preferencelist=('plain'))
-                        if corpo_email:
-                            contexto.append(f"E-MAIL: {corpo_email.get_content()}")
-                    elif f['type'] == "application/pdf":
-                        contexto.append({"mime_type": "application/pdf", "data": f['content']})
-                    else:
-                        contexto.append(Image.open(io.BytesIO(f['content'])).convert('RGB'))
+                                msg = email.message_from_bytes(f['content'], policy=policy.default)
+                                corpo_email = msg.get_body(preferencelist=('plain'))
+                                if corpo_email:
+                                    contexto.append(f"E-MAIL: {corpo_email.get_content()}")
+                            elif f['type'] == "application/pdf":
+                                contexto.append({"mime_type": "application/pdf", "data": f['content']})
+                            else:
+                                contexto.append(Image.open(io.BytesIO(f['content'])).convert('RGB'))
 
-                if st.session_state.pergunta_ativa:
-                    contexto.append(st.session_state.pergunta_ativa)
+                        if st.session_state.pergunta_ativa:
+                            contexto.append(st.session_state.pergunta_ativa)
 
-                response = model.generate_content(contexto, request_options={"timeout": 600})
-                if response and hasattr(response, "text"):
-                    st.session_state.historico_pericial.append(response.text)
-                else:
-                    st.error("Resposta inválida do modelo.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro de instabilidade: {e}")
+                                               response = model.generate_content(contexto, request_options={"timeout": 600})
+                        if response and hasattr(response, "text"):
+                            st.session_state.historico_pericial.append(response.text)
+                        else:
+                            st.error("Resposta inválida do modelo.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro de instabilidade: {e}")
 
     with col2:
-        if st.button("🗑️ LIMPAR CASO", type="secondary"):
+        if st.button("🗑️ LIMPAR CASO"):
             st.session_state.historico_pericial = []
             st.session_state.arquivos_acumulados = []
             st.session_state.pergunta_ativa = ""
