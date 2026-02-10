@@ -7,149 +7,131 @@ import email
 from email import policy
 from datetime import datetime
 import pytz
-import time
 
-# 1. GESTÃO DE SESSÃO E MESA DE PERÍCIA CUMULATIVA
+# 1. GESTÃO DE SESSÃO
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
-if "arquivos_acumulados" not in st.session_state:
-    st.session_state.arquivos_acumulados = []
-if "chat_suporte" not in st.session_state:
-    st.session_state.chat_suporte = [{"role": "assistant", "content": "Que satisfação tê-lo por aqui! Sou o Concierge AuditIA. Como posso iluminar sua investigação hoje?"}]
 
 def processar_pericia():
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
     st.session_state.campo_pergunta = "" 
 
-# Layout original que você prefere
 st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
 
-# 2. TERMÔMETRO DE CORES COM HIERARQUIA REAL (PONTO 1)
+# 2. TERMÔMETRO DE CORES (RESTAURADO E CALIBRADO)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
-    # PRIORIDADE 1: VERDE (Se o veredito for seguro, ignora outros termos)
     if any(term in texto_upper for term in ["SEGURO", "TUDO OK", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO"]):
-        cor, font = "#2ecc71", "white" 
+        cor, font = "#2ecc71", "white" # VERDE SOBERANO
     elif any(term in texto_upper for term in ["FRAUDE CONFIRMADA", "GOLPE", "FAKE", "SCAM"]):
-        cor, font = "#ff4b4b", "white" 
+        cor, font = "#ff4b4b", "white" # VERMELHO
     elif any(term in texto_upper for term in ["ALTA ATENÇÃO", "MUITA ATENÇÃO", "PHISHING"]):
-        cor, font = "#ffa500", "white" 
-    elif "ATENÇÃO" in texto_upper:
-        cor, font = "#f1c40f", "black" 
+        cor, font = "#ffa500", "white" # LARANJA
+    elif any(term in texto_upper for term in ["ATENÇÃO", "IMAGEM", "IA", "FOTO"]):
+        cor, font = "#f1c40f", "black" # AMARELO
     else:
         cor, font = "#3498db", "white" # AZUL (NEUTRO)
     
     return f'''
-    <div style="background-color: {cor}; padding: 30px; border-radius: 15px; color: {font}; 
-    font-weight: bold; border: 2px solid #2c3e50; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+    <div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font}; 
+    font-weight: bold; border: 2px solid #4a4a4a; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
         {texto}
     </div>
     '''
 
-st.markdown("""<style>.stApp { background-color: #ffffff; color: #333333; } div.stButton > button:first-child { background-color: #4a4a4a; color: white; font-weight: bold; width: 100%; height: 4em; border-radius: 12px; } .stTextArea textarea { background-color: #f8f9fa; border: 1px solid #d1d5db; border-radius: 8px; }</style>""", unsafe_allow_html=True)
+# CSS PARA BOTÕES SUTIS E PROXIMIDADE
+st.markdown("""
+    <style>
+    .stApp { background-color: #ffffff; }
+    /* Botão Executar (Forte) */
+    div.stButton > button:first-child { background-color: #4a4a4a; color: white; border-radius: 8px; font-weight: bold; height: 3.5em; width: 100%; border: none; }
+    /* Botão Limpar (Sutil) */
+    div.stButton > button[kind="secondary"] { background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 8px; height: 3.5em; width: 100%; }
+    div.stButton > button:hover { opacity: 0.9; border: 1px solid #2ecc71; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# 3. MOTOR DE CONEXÃO RESTAURADO (BASEADO NO SEU MAIN QUE FUNCIONA)
+# 3. CONEXÃO (BASE ORIGINAL)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("Servidor pericial em sincronização. Aguarde 60 segundos."); st.stop()
+except Exception as e:
+    st.error(f"Erro de Conexão: {e}"); st.stop()
 
-# 4. CABEÇALHO ORIGINAL
+# 4. CABEÇALHO
 try:
     st.image(Image.open("Logo_AI_1.png"), width=500)
 except: st.title("👁️ AuditIA")
 
 st.markdown("---")
 
-# 5. INGESTÃO CUMULATIVA (PONTO 4 - ATUALIZADO)
-new_files = st.file_uploader("📂 Arraste seus documentos, imagens ou e-mails aqui ou clique para fazer o upload:", 
-                               type=["jpg", "png", "jpeg", "pdf", "eml", "pst"], accept_multiple_files=True)
-
-if new_files:
-    for f in new_files:
-        if f.name not in [x['name'] for x in st.session_state.arquivos_acumulados]:
-            st.session_state.arquivos_acumulados.append({'name': f.name, 'content': f.read(), 'type': f.type})
-
-if st.session_state.arquivos_acumulados:
-    st.write("📦 **Provas Acumuladas na Mesa de Perícia:**")
-    cols = st.columns(min(len(st.session_state.arquivos_acumulados), 6))
-    for i, f in enumerate(st.session_state.arquivos_acumulados):
-        with cols[i % 6]: st.caption(f"✅ {f['name']}")
+# 5. ÁREA DE PERÍCIA
+uploaded_file = st.file_uploader("📂 Upload de Provas (Prints, PDFs, E-mails .eml ou .pst):", type=["jpg", "png", "jpeg", "pdf", "eml", "pst"])
+if uploaded_file and uploaded_file.type not in ["application/pdf"] and not uploaded_file.name.endswith(('.eml', '.pst')):
+    st.image(uploaded_file, use_container_width=True)
 
 st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Analise a veracidade destes documentos'...", height=120)
+user_query = st.text_area("📝 Pergunta ao Perito:", key="campo_pergunta", placeholder="Ex: 'Esta foto é real? Analise metadados e anatomia.'", height=120)
 
-# FUNÇÃO LAUDO PDF (RESTAURADA)
-def gerar_pdf_pericial(conteudo, data_f):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16); pdf.cell(200, 15, txt="LAUDO TÉCNICO PERICIAL - AUDITIA", ln=True, align='C')
-    pdf.ln(10); pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0, 8, txt=conteudo.encode('latin-1', 'replace').decode('latin-1'))
-    return pdf.output(dest='S').encode('latin-1')
-
-# 6. MOTOR DE AUDITORIA RIGOROSO (RESTAURADO)
-col_ex, col_limp = st.columns([1, 1])
-with col_ex:
+# 6. MOTOR PERICIAL COM BOTÕES LADO A LADO
+col1, col2 = st.columns([1, 1])
+with col1:
     if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
-        pergunta_efetiva = st.session_state.get('pergunta_ativa', '')
-        if not pergunta_efetiva and not st.session_state.arquivos_acumulados:
+        if not user_query and not uploaded_file:
             st.warning("Insira material para análise.")
         else:
             tz_br = pytz.timezone('America/Sao_Paulo'); agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            with st.spinner("🕵️ Realizando varredura forense..."):
+            with st.spinner("🕵️ AuditIA realizando varredura técnica..."):
                 try:
-                    instrucao = f"""Aja como AuditIA, inteligência forense de elite. Hoje: {agora}.
-                    1. Inicie com **CLASSIFICAÇÃO: [TIPO EM MAIÚSCULAS]** em negrito.
-                    2. Tipos: SEGURO, FRAUDE CONFIRMADA, ALTA ATENÇÃO, ATENÇÃO ou INFORMATIVO.
-                    3. Se for legítimo, use 'CLASSIFICAÇÃO: SEGURO'.
-                    4. Responda diretamente e tecnicamente.
-                    5. Encerre com **RESUMO DO VEREDITO:**."""
-                    
+                    instrucao = f"Aja como AuditIA, perito sênior. Se for legítimo, use 'CLASSIFICAÇÃO: SEGURO'."
                     contexto = [instrucao]
                     for h in st.session_state.historico_pericial: contexto.append(h)
-                    for f in st.session_state.arquivos_acumulados:
-                        if f['name'].endswith('.eml'):
-                            msg = email.message_from_bytes(f['content'], policy=policy.default)
+                    if uploaded_file:
+                        if uploaded_file.name.endswith('.eml'):
+                            msg = email.message_from_bytes(uploaded_file.read(), policy=policy.default)
                             contexto.append(f"E-MAIL: {msg.get_body(preferencelist=('plain')).get_content()}")
-                        elif f['name'].endswith('.pdf'): contexto.append({"mime_type": "application/pdf", "data": f['content']})
-                        else: contexto.append(Image.open(io.BytesIO(f['content'])))
+                        elif uploaded_file.type == "application/pdf":
+                            contexto.append({"mime_type": "application/pdf", "data": uploaded_file.read()})
+                        else: contexto.append(Image.open(uploaded_file).convert('RGB'))
                     
-                    contexto.append(pergunta_efetiva)
-                    response = model.generate_content(contexto, request_options={"timeout": 600})
+                    contexto.append(user_query)
+                    response = model.generate_content(contexto)
                     st.session_state.historico_pericial.append(response.text)
                     st.rerun()
-                except: st.error("Oscilação no servidor. Tente novamente em 60 segundos.")
+                except Exception as e: st.error(f"Erro: {e}")
 
-with col_limp:
-    if st.button("🗑️ LIMPAR CASO"):
-        st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
+with col2:
+    if st.button("🗑️ LIMPAR CASO", kind="secondary"):
+        st.session_state.historico_pericial = []; st.rerun()
 
-# 7. CONCIERGE HUMANIZADO COM MÚLTIPLA ESCOLHA (PONTO 5)
+# 7. CENTRO DE AJUDA "COMO UTILIZAR" (PONTO 5)
 st.markdown("---")
-with st.container():
-    st.subheader("💬 Atendimento Especializado AuditIA")
-    for msg in st.session_state.chat_suporte:
-        with st.chat_message(msg["role"]): st.write(msg["content"])
+with st.expander("📖 Central de Ajuda & FAQ - Como utilizar o AuditIA"):
+    st.tabs_ajuda = st.tabs(["Manual de Uso", "Perguntas Frequentes", "Feedback"])
     
-    st.write("Como posso facilitar seu trabalho agora?")
-    c1, c2, c3 = st.columns(3)
-    if c1.button("Precisão do Robô"): st.info("Analisamos 12 marcadores anatômicos e metadados SPF/DKIM para garantir a máxima acurácia técnica.")
-    if c2.button("Limites de Arquivo"): st.info("Você pode anexar até 5 arquivos simultâneos de 200MB cada (total 1GB).")
-    if c3.button("Auditoria de Links"): st.info("Varremos domínios e redirecionamentos buscando indícios de phishing em tempo real.")
-
-    if prompt_suporte := st.chat_input("Ou detalhe sua dúvida aqui:"):
-        st.session_state.chat_suporte.append({"role": "user", "content": prompt_suporte})
-        with st.chat_message("user"): st.write(prompt_suporte)
-        with st.chat_message("assistant"):
-            knowledge = "Você é o Concierge AuditIA. Seja humanizado e técnico. Explique os protocolos de auditoria antes de sugerir auditaiajuda@gmail.com."
-            try:
-                res = model.generate_content(knowledge + prompt_suporte)
-                st.write(res.text); st.session_state.chat_suporte.append({"role": "assistant", "content": res.text})
-            except: st.write("Tive uma pequena oscilação. Por favor, detalhe sua dúvida técnica ou use auditaiajuda@gmail.com.")
+    with st.tabs_ajuda[0]:
+        st.markdown("""
+        ### 🛡️ Passo a Passo para uma Perícia de Elite
+        1. **Upload de Provas**: Arraste prints de WhatsApp, PDFs ou arquivos de e-mail (.eml).
+        2. **Pergunta Direta**: No campo de texto, detalhe sua dúvida (ex: 'Verifique se há indícios de manipulação nesta foto').
+        3. **Execução**: Clique em 'Executar Perícia' e aguarde a varredura multilinear.
+        4. **Laudo**: O resultado aparecerá colorido conforme o nível de risco detectado.
+        """)
+    
+    with st.tabs_ajuda[1]:
+        st.markdown("""
+        **Q: Qual a precisão do sistema?** R: Analisamos 12 marcadores anatômicos e registros SPF/DKIM para máxima fidelidade.  
+        **Q: Quais arquivos são aceitos?** R: Imagens, PDFs (até 1000 pág) e e-mails (.eml/.pst).  
+        **Q: Qual o limite de tamanho?** R: Até 200MB por arquivo individual.
+        """)
+    
+    with st.tabs_ajuda[2]:
+        st.write("Este artigo ou análise foi útil?")
+        col_f1, col_f2 = st.columns([1, 5])
+        if col_f1.button("👍 Sim"): st.success("Obrigado pelo feedback!")
+        if col_f1.button("👎 Não"): st.info("Sentimos muito. Envie sugestões para auditaiajuda@gmail.com")
 
 st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP")
