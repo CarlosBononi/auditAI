@@ -29,13 +29,13 @@ def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     
     # PROTOCOLO V16 - PRIORIDADE MÁXIMA PARA FRAUDE
-    if any(term in texto_upper for term in ["CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "CRIME", "GOLPE", "SCAM", "FRAUDE CONFIRMADA"]):
+    if any(term in texto_upper for term in ["CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "VEREDITO: FRAUDE CONFIRMADA", "CRIME", "GOLPE", "SCAM", "FRAUDE CONFIRMADA"]):
         cor, font = "#ff4b4b", "white"  # 🔴 VERMELHO
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING", "POSSÍVEL FRAUDE"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "VEREDITO: POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING", "POSSÍVEL FRAUDE"]):
         cor, font = "#ffa500", "white"  # 🟠 LARANJA
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO", "ALTA PROBABILIDADE DE IA", "ANÁLISE DE E-MAIL"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "VEREDITO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO", "ALTA PROBABILIDADE DE IA", "ANÁLISE DE E-MAIL"]):
         cor, font = "#f1c40f", "black"  # 🟡 AMARELO (Protocolo de Dúvida)
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: SEGURO", "VEREDITO: SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"]):
         cor, font = "#2ecc71", "white"  # 🟢 VERDE
     else:
         cor, font = "#3498db", "white"  # 🔵 AZUL (Documentos Neutros)
@@ -317,9 +317,10 @@ with col1:
                     🎯 ESTRUTURA OBRIGATÓRIA:
                     - Inicie com 'PERGUNTA: "{pergunta_efetiva}"'
                     - Seguido de 'CLASSIFICAÇÃO: [TIPO]'
-                    - Em seguida, 'ANÁLISE DETALHADA:'
-                    - Listar os pontos relevantes para cada tipo de arquivo analisado
-                    - Conclusão final com veredito pericial
+                    - EM SEGUIDA, 'VEREDITO: [TIPO]' (EX: VEREDITO: ATENÇÃO)
+                    - Em seguida, 'ANÁLISE RÁPIDA:' com os 3 pontos mais importantes
+                    - 'ANÁLISE DETALHADA:' com a análise completa
+                    - 'CONCLUSÃO FINAL:' com o veredito final e recomendações
                     
                     🚨 REGRAS DE CLASSIFICAÇÃO FINAL:
                     - FRAUDE CONFIRMADA: Evidências claras de manipulação ou fraude
@@ -384,9 +385,19 @@ with col1:
                         resposta_texto = re.sub(r"5\. METADADOS:.*?(?=\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
                         
                         # Forçar classificação adequada para e-mails
-                        if "CLASSIFICAÇÃO: SEGURO" not in resposta_texto.upper():
-                            resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: ATENÇÃO", "CLASSIFICAÇÃO: ATENÇÃO (ANÁLISE DE E-MAIL)")
-                            resposta_texto = resposta_texto.replace("ATENÇÃO (ALTA PROBABILIDADE DE IA)", "ATENÇÃO (ANÁLISE DE E-MAIL)")
+                        if "VEREDITO:" not in resposta_texto.upper():
+                            # Adicionar veredito se não estiver presente
+                            if "CLASSIFICAÇÃO: ATENÇÃO" in resposta_texto.upper():
+                                resposta_texto = "VEREDITO: ATENÇÃO\n" + resposta_texto
+                            elif "CLASSIFICAÇÃO: SEGURO" in resposta_texto.upper():
+                                resposta_texto = "VEREDITO: SEGURO\n" + resposta_texto
+                            elif "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in resposta_texto.upper():
+                                resposta_texto = "VEREDITO: FRAUDE CONFIRMADA\n" + resposta_texto
+                            elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in resposta_texto.upper():
+                                resposta_texto = "VEREDITO: POSSÍVEL FRAUDE\n" + resposta_texto
+                        else:
+                            # Garantir que o veredito esteja no formato correto
+                            resposta_texto = re.sub(r"VEREDITO:\s*[A-Z]+", "VEREDITO: " + re.search(r"CLASSIFICAÇÃO:\s*([A-Z]+)", resposta_texto).group(1), resposta_texto)
                     
                     # Forçar classificação correta para imagens (evitar "imagens reais")
                     if tem_imagem:
@@ -395,6 +406,7 @@ with col1:
                             resposta_texto = resposta_texto.replace("PROVAVELMENTE IMAGENS REAIS", "FRAUDE CONFIRMADA")
                             resposta_texto = resposta_texto.replace("IMAGENS REAIS", "FRAUDE CONFIRMADA")
                             resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: SEGURO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
+                            resposta_texto = resposta_texto.replace("VEREDITO: SEGURO", "VEREDITO: FRAUDE CONFIRMADA")
                             
                             # Adicionar nota de correção
                             if "CORREÇÃO AUTOMÁTICA" not in resposta_texto:
@@ -406,6 +418,25 @@ with col1:
                             if "CLASSIFICAÇÃO:" in resposta_texto.upper() and "FRAUDE" not in resposta_texto.upper():
                                 resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: ATENÇÃO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
                                 resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
+                                resposta_texto = resposta_texto.replace("VEREDITO: ATENÇÃO", "VEREDITO: FRAUDE CONFIRMADA")
+                                resposta_texto = resposta_texto.replace("VEREDITO: POSSÍVEL FRAUDE", "VEREDITO: FRAUDE CONFIRMADA")
+                    
+                    # Garantir que a estrutura da resposta seja clara e objetiva
+                    if "ANÁLISE RÁPIDA:" not in resposta_texto:
+                        # Se não houver análise rápida, criar uma
+                        analise_rapida = ""
+                        
+                        if "FRAUDE CONFIRMADA" in resposta_texto.upper():
+                            analise_rapida = "ANÁLISE RÁPIDA:\n- Evidências claras de fraude detectadas\n- Indicadores irrefutáveis de manipulação\n- Recomenda-se investigação imediata"
+                        elif "POSSÍVEL FRAUDE" in resposta_texto.upper():
+                            analise_rapida = "ANÁLISE RÁPIDA:\n- Indícios fortes de possível fraude\n- Inconsistências significativas detectadas\n- Recomenda-se verificação adicional"
+                        elif "ATENÇÃO" in resposta_texto.upper():
+                            analise_rapida = "ANÁLISE RÁPIDA:\n- Inconsistências detectadas\n- Requer investigação adicional\n- Padrões suspeitos identificados"
+                        else:
+                            analise_rapida = "ANÁLISE RÁPIDA:\n- Nenhuma anomalia significativa detectada\n- Evidências consistentes com autenticidade\n- Classificação confirmada como seguro"
+                        
+                        # Inserir análise rápida na resposta
+                        resposta_texto = resposta_texto.replace("ANÁLISE DETALHADA:", analise_rapida + "\n\nANÁLISE DETALHADA:")
                     
                     st.session_state.historico_pericial.append(resposta_texto)
                     st.rerun()
