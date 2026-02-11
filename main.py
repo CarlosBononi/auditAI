@@ -35,12 +35,18 @@ st.markdown("""
 <style>
     /* Cores baseadas na logo */
     :root {
-        --primary-color: #1e3a8a;
-        --secondary-color: #3b82f6;
-        --accent-color: #60a5fa;
+        --verde-logo: #c8e6c9;
+        --verde-escuro: #66bb6a;
+        --cinza-claro: #e0e0e0;
+        --cinza-medio: #757575;
     }
 
-    /* Botões harmonizados */
+    /* Sidebar com fundo verde claro */
+    [data-testid="stSidebar"] {
+        background-color: #e8f5e9;
+    }
+
+    /* Botões com cinza claro */
     .stButton > button {
         width: 100%;
         padding: 0.5rem 1rem;
@@ -48,46 +54,28 @@ st.markdown("""
         font-weight: 500;
         transition: all 0.3s;
         margin: 0.25rem 0;
+        background-color: #e0e0e0;
+        color: #424242;
+        border: 2px solid #bdbdbd;
     }
 
-    /* Botão primário - Analisar */
+    .stButton > button:hover {
+        background-color: #bdbdbd;
+        border-color: #9e9e9e;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    /* Botão Analisar destacado */
     div[data-testid="column"]:first-child .stButton > button {
-        background-color: #1e3a8a;
+        background-color: #66bb6a;
         color: white;
-        border: 2px solid #1e3a8a;
+        border-color: #66bb6a;
     }
 
     div[data-testid="column"]:first-child .stButton > button:hover {
-        background-color: #3b82f6;
-        border-color: #3b82f6;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
-    }
-
-    /* Botão secundário - Limpar */
-    div[data-testid="column"]:nth-child(2) .stButton > button {
-        background-color: white;
-        color: #1e3a8a;
-        border: 2px solid #1e3a8a;
-    }
-
-    div[data-testid="column"]:nth-child(2) .stButton > button:hover {
-        background-color: #fee2e2;
-        border-color: #dc2626;
-        color: #dc2626;
-    }
-
-    /* Botão terciário - Exportar PDF */
-    div[data-testid="column"]:nth-child(3) .stButton > button {
-        background-color: #f8fafc;
-        color: #475569;
-        border: 2px solid #cbd5e1;
-    }
-
-    div[data-testid="column"]:nth-child(3) .stButton > button:hover {
-        background-color: #22c55e;
-        border-color: #22c55e;
-        color: white;
+        background-color: #4caf50;
+        border-color: #4caf50;
     }
 
     /* Redimensionar imagens anexadas */
@@ -99,21 +87,35 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    /* Melhorar aparência do termo de consentimento */
+    /* Termo de consentimento com fundo verde claro */
     .termo-consentimento {
-        background-color: #fffbeb;
-        border-left: 4px solid #f59e0b;
+        background-color: #e8f5e9;
+        border-left: 4px solid #66bb6a;
         padding: 1.5rem;
         border-radius: 8px;
         margin: 1rem 0;
     }
 
-    /* Checkbox do termo */
+    /* Checkbox do termo com fundo verde */
     .stCheckbox {
         padding: 1rem;
-        background-color: #fef3c7;
+        background-color: #f1f8e9;
         border-radius: 8px;
         margin: 1rem 0;
+    }
+
+    /* Caixas de texto com fundo verde claro */
+    .stTextArea textarea,
+    .stTextInput input {
+        background-color: #f1f8e9 !important;
+        border-color: #c5e1a5 !important;
+    }
+
+    /* Área de upload com fundo verde claro */
+    [data-testid="stFileUploader"] {
+        background-color: #f1f8e9;
+        border-radius: 8px;
+        padding: 1rem;
     }
 
     /* Ajustar tamanho do subtítulo */
@@ -123,6 +125,28 @@ st.markdown("""
         font-weight: 400;
         margin-top: -0.5rem;
         margin-bottom: 1.5rem;
+    }
+
+    /* Diminuir título Upload de Arquivos */
+    h1 {
+        font-size: 1.8rem !important;
+    }
+
+    /* Estilo para veredito em destaque */
+    .veredito-destaque {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin: 1rem 0;
+    }
+
+    /* Resumo final */
+    .resumo-final {
+        background-color: #f5f5f5;
+        border-left: 4px solid #66bb6a;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+        font-size: 1.05rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -155,12 +179,7 @@ def processar_pericia():
 # ==================== SISTEMA DE CORES INTELIGENTE ====================
 def aplicar_estilo_pericial(texto):
     """
-    Sistema de classificação visual com hierarquia clara:
-    🔴 VERMELHO: Fraude confirmada
-    🟠 LARANJA: Possível fraude / Alto risco
-    🟡 AMARELO: Atenção / Análise necessária
-    🟢 VERDE: Seguro / Legítimo
-    🔵 AZUL: Informativo
+    Sistema de classificação visual com hierarquia clara
     """
     texto_upper = texto.upper()
 
@@ -169,28 +188,33 @@ def aplicar_estilo_pericial(texto):
         "CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "VEREDITO: FRAUDE CONFIRMADA",
         "GOLPE CONFIRMADO", "SCAM CONFIRMADO", "FRAUDE CONFIRMADA"
     ]):
-        cor, font = "#dc2626", "white"  # 🔴 VERMELHO
+        cor, font = "#d32f2f", "white"  # 🔴 VERMELHO
+        nivel = "FRAUDE CONFIRMADA"
 
     elif any(term in texto_upper for term in [
         "CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "VEREDITO: POSSÍVEL FRAUDE",
         "ALTA ATENÇÃO", "MUITO SUSPEITO", "PHISHING", "POSSÍVEL FRAUDE"
     ]):
-        cor, font = "#ea580c", "white"  # 🟠 LARANJA
+        cor, font = "#f57c00", "white"  # 🟠 LARANJA
+        nivel = "POSSÍVEL FRAUDE"
 
     elif any(term in texto_upper for term in [
         "CLASSIFICAÇÃO: ATENÇÃO", "VEREDITO: ATENÇÃO",
         "SUSPEITO", "ANÁLISE NECESSÁRIA", "INCONSISTÊNCIAS"
     ]):
-        cor, font = "#eab308", "black"  # 🟡 AMARELO
+        cor, font = "#fbc02d", "black"  # 🟡 AMARELO
+        nivel = "ATENÇÃO"
 
     elif any(term in texto_upper for term in [
         "CLASSIFICAÇÃO: SEGURO", "VEREDITO: SEGURO",
         "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"
     ]):
-        cor, font = "#16a34a", "white"  # 🟢 VERDE
+        cor, font = "#388e3c", "white"  # 🟢 VERDE
+        nivel = "SEGURO"
 
     else:
-        cor, font = "#2563eb", "white"  # 🔵 AZUL
+        cor, font = "#1976d2", "white"  # 🔵 AZUL
+        nivel = "INFORMATIVO"
 
     return f"""
     <div style="background-color: {cor}; color: {font}; padding: 1.5rem; 
@@ -198,7 +222,27 @@ def aplicar_estilo_pericial(texto):
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
         {texto.replace(chr(10), '<br>')}
     </div>
-    """, cor
+    """, cor, nivel
+
+def extrair_resumo(texto, nivel):
+    """Extrai resumo do veredito"""
+    linhas = texto.split('\n')
+    resumo = ""
+
+    # Pegar as primeiras linhas após o veredito
+    capturar = False
+    contador = 0
+    for linha in linhas:
+        if "VEREDITO FINAL" in linha.upper() or "CLASSIFICAÇÃO:" in linha.upper():
+            capturar = True
+            continue
+        if capturar and linha.strip() and not linha.startswith('#'):
+            resumo += linha.strip() + " "
+            contador += 1
+            if contador >= 3:  # Pegar até 3 linhas
+                break
+
+    return resumo[:300] if resumo else "Análise concluída. Veja detalhes acima."
 
 # ==================== PROMPTS OTIMIZADOS ====================
 def obter_prompt_analise(tipo_arquivo):
@@ -285,7 +329,6 @@ def obter_prompt_analise(tipo_arquivo):
 def analisar_imagem(image, pergunta_usuario=""):
     """Análise de imagem com prompt otimizado"""
     try:
-        # Redimensionar imagem para otimizar processamento
         img = Image.open(image)
         img.thumbnail((1024, 1024))
 
@@ -305,13 +348,11 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
     try:
         msg = BytesParser(policy=policy.default).parsebytes(arquivo_email.getvalue())
 
-        # Extrair informações completas
         remetente = msg.get("From", "Não identificado")
         destinatario = msg.get("To", "Não identificado")
         assunto = msg.get("Subject", "Sem assunto")
         data = msg.get("Date", "Sem data")
 
-        # Extrair corpo do e-mail
         corpo = ""
         if msg.is_multipart():
             for part in msg.walk():
@@ -321,11 +362,9 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
         else:
             corpo = msg.get_payload(decode=True).decode(errors="ignore")
 
-        # Extrair cabeçalhos de autenticação
         spf = msg.get("Received-SPF", "Não disponível")
         dkim = msg.get("DKIM-Signature", "Não disponível")
 
-        # Montar contexto completo
         contexto = f"""
         === DADOS DO E-MAIL ===
         Remetente: {remetente}
@@ -334,7 +373,7 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
         Data: {data}
 
         === CONTEÚDO DA MENSAGEM ===
-        {corpo[:2000]}  # Limitar para não exceder tokens
+        {corpo[:2000]}
 
         === AUTENTICAÇÃO ===
         SPF: {spf}
@@ -361,7 +400,6 @@ def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
         if pergunta_usuario:
             prompt += f"\n\nPERGUNTA DO USUÁRIO: {pergunta_usuario}"
 
-        # Upload do PDF para análise
         resposta = model.generate_content([prompt, arquivo_pdf.getvalue()])
         return resposta.text
     except Exception as e:
@@ -369,16 +407,16 @@ def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
 
 # ==================== INTERFACE PRINCIPAL ====================
 
-# Logo (MAIOR e sem texto redundante)
+# Logo GRANDE (1000px)
 try:
     if os.path.exists("Logo_AI_1.png"):
         logo = Image.open("Logo_AI_1.png")
-        st.image(logo, width=1000)  # Logo MAIOR
+        st.image(logo, width=1000)
 except:
-    pass  # Se não tiver logo, não mostra nada
+    pass
 
-# Subtítulo pequeno (SEM título grande redundante)
-st.markdown('<p class="subtitle-custom">Inteligência Forense Digital</p>', unsafe_allow_html=True)
+# Subtítulo pequeno
+st.markdown('<p class="subtitle-custom">Inteligência Forense Digital | Desenvolvido em Vargem Grande do Sul - SP</p>', unsafe_allow_html=True)
 
 # ==================== TERMO DE CONSENTIMENTO ====================
 with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES DE USAR", expanded=not st.session_state.termo_aceito):
@@ -428,7 +466,6 @@ with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES 
         st.success("✅ Termo aceito! Você já pode usar o AuditIA.")
         st.rerun()
 
-# Bloquear uso se termo não foi aceito
 if not st.session_state.termo_aceito:
     st.warning("⚠️ Por favor, leia e aceite o Termo de Consentimento acima para utilizar o AuditIA.")
     st.stop()
@@ -565,7 +602,6 @@ arquivos = st.file_uploader(
     help="Suporte para imagens, PDFs e e-mails (.eml, .pst)"
 )
 
-# Campo de pergunta
 pergunta = st.text_area(
     "💬 Pergunta Específica (Opcional)",
     placeholder="Ex: Este e-mail é legítimo? Esta imagem foi manipulada? Este documento é autêntico?",
@@ -573,7 +609,6 @@ pergunta = st.text_area(
     help="Faça perguntas específicas para direcionar a análise"
 )
 
-# Botões de ação organizados
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -591,13 +626,11 @@ if analisar_btn and arquivos:
         for arquivo in arquivos:
             st.markdown(f"### 📄 Analisando: `{arquivo.name}`")
 
-            # Miniatura da imagem (se for imagem)
             if arquivo.type.startswith("image/"):
                 img = Image.open(arquivo)
                 img.thumbnail((300, 300))
                 st.image(img, caption=arquivo.name, width=300)
 
-            # Processar análise
             if arquivo.type in ["image/jpeg", "image/png", "image/jpg"]:
                 resultado = analisar_imagem(arquivo, st.session_state.pergunta_ativa)
             elif arquivo.type == "message/rfc822" or arquivo.name.endswith(".eml"):
@@ -607,15 +640,24 @@ if analisar_btn and arquivos:
             else:
                 resultado = "❌ Formato de arquivo não suportado"
 
-            # Exibir resultado com estilo
-            html_resultado, cor = aplicar_estilo_pericial(resultado)
+            html_resultado, cor, nivel = aplicar_estilo_pericial(resultado)
             st.markdown(html_resultado, unsafe_allow_html=True)
 
-            # Adicionar ao histórico
+            # RESUMO FINAL
+            resumo = extrair_resumo(resultado, nivel)
+            st.markdown(f"""
+            <div class="resumo-final">
+                <div class="veredito-destaque">📊 RESUMO DO RESULTADO</div>
+                <strong>Classificação:</strong> {nivel}<br>
+                <strong>Conclusão:</strong> {resumo}
+            </div>
+            """, unsafe_allow_html=True)
+
             st.session_state.historico_pericial.append({
                 "arquivo": arquivo.name,
                 "resultado": resultado,
                 "cor": cor,
+                "nivel": nivel,
                 "timestamp": datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
             })
 
@@ -628,13 +670,11 @@ if st.session_state.historico_pericial:
     st.header("📊 Histórico de Análises do Caso Atual")
 
     for i, item in enumerate(st.session_state.historico_pericial, 1):
-        with st.expander(f"🔎 Análise #{i} - {item['arquivo']} | {item['timestamp']}"):
-            html_hist, _ = aplicar_estilo_pericial(item['resultado'])
+        with st.expander(f"🔎 Análise #{i} - {item['arquivo']} | {item['timestamp']} | {item['nivel']}"):
+            html_hist, _, _ = aplicar_estilo_pericial(item['resultado'])
             st.markdown(html_hist, unsafe_allow_html=True)
 
 # ==================== RODAPÉ ====================
 st.markdown("---")
-st.caption("👁️ AuditIA v2.0 | Desenvolvido em Vargem Grande do Sul - SP | © 2026")
+st.caption("👁️ AuditIA v2.0 | © 2026")
 st.caption("⚠️ Ferramenta de apoio - Não substitui perícia oficial")
-
-
