@@ -9,7 +9,7 @@ from email.parser import BytesParser
 from datetime import datetime
 import pytz
 import re
-import hashlib
+import os
 
 # ==================== CONFIGURAÇÃO INICIAL ====================
 st.set_page_config(
@@ -18,6 +18,13 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="expanded"
 )
+
+# Configurar API do Gemini
+try:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+except Exception as e:
+    st.error("⚠️ Erro ao configurar API do Gemini. Verifique as configurações.")
+    st.stop()
 
 # ==================== ESTILO CUSTOMIZADO ====================
 st.markdown("""
@@ -269,7 +276,7 @@ def analisar_imagem(image, pergunta_usuario=""):
         img = Image.open(image)
         img.thumbnail((1024, 1024))
 
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = obter_prompt_analise("image/jpeg")
 
         if pergunta_usuario:
@@ -321,7 +328,7 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
         DKIM: {'Presente' if 'não disponível' not in dkim.lower() else 'Ausente'}
         """
 
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = obter_prompt_analise("message/rfc822") + f"\n\n{contexto}"
 
         if pergunta_usuario:
@@ -335,19 +342,14 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
 def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
     """Análise de PDF"""
     try:
-        # Converter PDF em imagens para análise visual
-        from pdf2image import pdfinfo_from_bytes, convert_from_bytes
-
-        info = pdfinfo_from_bytes(arquivo_pdf.getvalue())
-        primeira_pagina = convert_from_bytes(arquivo_pdf.getvalue(), first_page=1, last_page=1)[0]
-
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = obter_prompt_analise("application/pdf")
 
         if pergunta_usuario:
             prompt += f"\n\nPERGUNTA DO USUÁRIO: {pergunta_usuario}"
 
-        resposta = model.generate_content([prompt, primeira_pagina])
+        # Upload do PDF para análise
+        resposta = model.generate_content([prompt, arquivo_pdf.getvalue()])
         return resposta.text
     except Exception as e:
         return f"❌ Erro na análise de PDF: {str(e)}"
@@ -355,7 +357,17 @@ def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
 # ==================== INTERFACE PRINCIPAL ====================
 
 # Logo e cabeçalho
-st.image("https://via.placeholder.com/150x50/1e3a8a/ffffff?text=AuditIA", width=150)
+try:
+    # Tentar carregar logo local
+    if os.path.exists("Logo_AI_1.png"):
+        logo = Image.open("Logo_AI_1.png")
+        st.image(logo, width=200)
+    else:
+        # Fallback: usar emoji
+        st.markdown("# 👁️")
+except:
+    st.markdown("# 👁️")
+
 st.title("👁️ AuditIA - Inteligência Forense Digital")
 st.caption("Análise pericial automatizada com IA | Desenvolvido em Vargem Grande do Sul - SP")
 
@@ -420,7 +432,7 @@ with st.sidebar:
         st.markdown("""
         O **AuditIA** é uma plataforma de **Inteligência Forense Digital** que combina:
 
-        - 🤖 **IA Avançada** (Gemini 1.5 Pro)
+        - 🤖 **IA Avançada** (Gemini 1.5)
         - 🔍 **Análise Multimodal** (imagens, e-mails, PDFs)
         - 🎭 **Psicologia Forense** (detecção de manipulação)
         - 🔐 **Verificação Técnica** (metadados, autenticação)
@@ -614,4 +626,4 @@ if st.session_state.historico_pericial:
 # ==================== RODAPÉ ====================
 st.markdown("---")
 st.caption("👁️ AuditIA v2.0 | Desenvolvido em Vargem Grande do Sul - SP | © 2026")
-st.caption("⚖️ Ferramenta de apoio - Não substitui perícia oficial")
+st.caption("⚠️ Ferramenta de apoio - Não substitui perícia oficial")
