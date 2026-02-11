@@ -9,521 +9,609 @@ from email.parser import BytesParser
 from datetime import datetime
 import pytz
 import re
+import hashlib
 
-# 1. GESTÃO DE SESSÃO E MESA DE PERÍCIA CUMULATIVA
+# ==================== CONFIGURAÇÃO INICIAL ====================
+st.set_page_config(
+    page_title="AuditIA - Inteligência Forense Digital",
+    page_icon="👁️",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+# ==================== ESTILO CUSTOMIZADO ====================
+st.markdown("""
+<style>
+    /* Cores baseadas na logo */
+    :root {
+        --primary-color: #1e3a8a;
+        --secondary-color: #3b82f6;
+        --accent-color: #60a5fa;
+    }
+
+    /* Botões harmonizados */
+    .stButton > button {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s;
+        margin: 0.25rem 0;
+    }
+
+    /* Botão primário - Analisar */
+    div[data-testid="column"]:first-child .stButton > button {
+        background-color: #1e3a8a;
+        color: white;
+        border: 2px solid #1e3a8a;
+    }
+
+    div[data-testid="column"]:first-child .stButton > button:hover {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+    }
+
+    /* Botão secundário - Limpar */
+    div[data-testid="column"]:nth-child(2) .stButton > button {
+        background-color: white;
+        color: #1e3a8a;
+        border: 2px solid #1e3a8a;
+    }
+
+    div[data-testid="column"]:nth-child(2) .stButton > button:hover {
+        background-color: #fee2e2;
+        border-color: #dc2626;
+        color: #dc2626;
+    }
+
+    /* Botão terciário - Exportar PDF */
+    div[data-testid="column"]:nth-child(3) .stButton > button {
+        background-color: #f8fafc;
+        color: #475569;
+        border: 2px solid #cbd5e1;
+    }
+
+    div[data-testid="column"]:nth-child(3) .stButton > button:hover {
+        background-color: #22c55e;
+        border-color: #22c55e;
+        color: white;
+    }
+
+    /* Redimensionar imagens anexadas */
+    .stImage img {
+        max-width: 300px !important;
+        max-height: 300px !important;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Melhorar aparência do termo de consentimento */
+    .termo-consentimento {
+        background-color: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+
+    /* Checkbox do termo */
+    .stCheckbox {
+        padding: 1rem;
+        background-color: #fef3c7;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==================== GESTÃO DE SESSÃO ====================
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
 if "arquivos_acumulados" not in st.session_state:
     st.session_state.arquivos_acumulados = []
 if "pergunta_ativa" not in st.session_state:
     st.session_state.pergunta_ativa = ""
+if "termo_aceito" not in st.session_state:
+    st.session_state.termo_aceito = False
+if "caso_id" not in st.session_state:
+    st.session_state.caso_id = None
+
+def iniciar_novo_caso():
+    """Limpa completamente o caso e inicia um novo"""
+    st.session_state.historico_pericial = []
+    st.session_state.arquivos_acumulados = []
+    st.session_state.pergunta_ativa = ""
+    st.session_state.caso_id = datetime.now().strftime("%Y%m%d%H%M%S")
+    st.rerun()
 
 def processar_pericia():
+    """Captura a pergunta antes do rerun"""
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
     st.session_state.campo_pergunta = ""
 
-st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
-
-# 2. SEMÁFORO DE CORES COM PROTOCOLO ESPECIALIZADO
+# ==================== SISTEMA DE CORES INTELIGENTE ====================
 def aplicar_estilo_pericial(texto):
+    """
+    Sistema de classificação visual com hierarquia clara:
+    🔴 VERMELHO: Fraude confirmada
+    🟠 LARANJA: Possível fraude / Alto risco
+    🟡 AMARELO: Atenção / Análise necessária
+    🟢 VERDE: Seguro / Legítimo
+    🔵 AZUL: Informativo
+    """
     texto_upper = texto.upper()
-    
-    # PROTOCOLO V16 - PRIORIDADE MÁXIMA PARA FRAUDE
-    if any(term in texto_upper for term in ["CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "VEREDITO: FRAUDE CONFIRMADA", "CRIME", "GOLPE", "SCAM", "FRAUDE CONFIRMADA"]):
-        cor, font = "#ff4b4b", "white"  # 🔴 VERMELHO
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "VEREDITO: POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING", "POSSÍVEL FRAUDE"]):
-        cor, font = "#ffa500", "white"  # 🟠 LARANJA
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "VEREDITO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO", "ALTA PROBABILIDADE DE IA", "ANÁLISE DE E-MAIL"]):
-        cor, font = "#f1c40f", "black"  # 🟡 AMARELO (Protocolo de Dúvida)
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: SEGURO", "VEREDITO: SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"]):
-        cor, font = "#2ecc71", "white"  # 🟢 VERDE
+
+    # Hierarquia de detecção
+    if any(term in texto_upper for term in [
+        "CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "VEREDITO: FRAUDE CONFIRMADA",
+        "GOLPE CONFIRMADO", "SCAM CONFIRMADO", "FRAUDE CONFIRMADA"
+    ]):
+        cor, font = "#dc2626", "white"  # 🔴 VERMELHO
+
+    elif any(term in texto_upper for term in [
+        "CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "VEREDITO: POSSÍVEL FRAUDE",
+        "ALTA ATENÇÃO", "MUITO SUSPEITO", "PHISHING", "POSSÍVEL FRAUDE"
+    ]):
+        cor, font = "#ea580c", "white"  # 🟠 LARANJA
+
+    elif any(term in texto_upper for term in [
+        "CLASSIFICAÇÃO: ATENÇÃO", "VEREDITO: ATENÇÃO",
+        "SUSPEITO", "ANÁLISE NECESSÁRIA", "INCONSISTÊNCIAS"
+    ]):
+        cor, font = "#eab308", "black"  # 🟡 AMARELO
+
+    elif any(term in texto_upper for term in [
+        "CLASSIFICAÇÃO: SEGURO", "VEREDITO: SEGURO",
+        "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"
+    ]):
+        cor, font = "#16a34a", "white"  # 🟢 VERDE
+
     else:
-        cor, font = "#3498db", "white"  # 🔵 AZUL (Documentos Neutros)
-    
-    return f'''
-    <div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: {font};
-    font-weight: bold; border: 2px solid #4a4a4b; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-    {texto}
+        cor, font = "#2563eb", "white"  # 🔵 AZUL
+
+    return f"""
+    <div style="background-color: {cor}; color: {font}; padding: 1.5rem; 
+                border-radius: 12px; margin: 1rem 0; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        {texto.replace(chr(10), '<br>')}
     </div>
-    '''
+    """, cor
 
-# 3. ESTILOS PERSONALIZADOS
-st.markdown("""
-<style>
-.stApp { background-color: #ffffff; color: #333333; }
-/* Botão Executar */
-div.stButton > button:first-child { 
-    background-color: #4a4a4a; 
-    color: white; 
-    font-weight: bold; 
-    width: 100%; 
-    height: 4em; 
-    border-radius: 10px;
-    border: none;
-}
-div.stButton > button:first-child:hover { 
-    background-color: #59ea63; 
-    color: black; 
-    transition: 0.3s;
-}
-/* Botão Limpar */
-div.stButton > button:nth-child(2) {
-    background-color: #e74c3c;
-    color: white;
-    font-weight: bold;
-    width: 100%;
-    height: 4em;
-    border-radius: 10px;
-}
-div.stButton > button:nth-child(2):hover {
-    background-color: #c0392b;
-    transition: 0.3s;
-}
-.stTextArea textarea { 
-    background-color: #f8f9fa; 
-    border: 1px solid #d1d5db; 
-    border-radius: 8px; 
-    font-size: 16px;
-}
-</style>
-""", unsafe_allow_html=True)
+# ==================== PROMPTS OTIMIZADOS ====================
+def obter_prompt_analise(tipo_arquivo):
+    """Retorna prompts equilibrados entre técnico e acessível"""
 
-# 4. CONEXÃO SEGURA COM SELEÇÃO DINÂMICA
-try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    modelos_disp = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    model = genai.GenerativeModel(modelos_disp[0] if modelos_disp else 'gemini-1.5-flash')
-except Exception as e:
-    st.error(f"⚠️ Erro de Conexão com AI: {e}")
-    st.stop()
+    prompt_base = """
+    Você é um especialista em análise forense digital. Sua análise deve ser:
+    - Clara e objetiva (acessível para público geral)
+    - Tecnicamente fundamentada (útil para auditores)
+    - Conclusiva (veredito claro e direto)
 
-# 5. CABEÇALHO
-try:
-    logo = Image.open("Logo_AI_1.png")
-    st.image(logo, width=500)
-except:
-    st.title("👁️ AuditIA - Inteligência Pericial Sênior")
+    ESTRUTURA OBRIGATÓRIA DA RESPOSTA:
 
-st.warning("⚠️ **TERMO DE CONSENTIMENTO:** Esta é uma ferramenta baseada em Inteligência Artificial Forense. Os resultados são probabilísticos e devem ser validados por perícia humana oficial.")
+    ## 🎯 VEREDITO FINAL
+    **CLASSIFICAÇÃO: [FRAUDE CONFIRMADA / POSSÍVEL FRAUDE / ATENÇÃO / SEGURO]**
 
-st.markdown("---")
+    [Em 2-3 linhas, explique de forma clara e direta sua conclusão]
 
-# 6. INGESTÃO MÚLTIPLA COM MINIATURAS
-new_files = st.file_uploader(
-    "📂 Upload de Provas (Prints, PDFs até 1000 pág, E-mails .eml ou .pst):",
-    type=["jpg", "png", "jpeg", "pdf", "eml", "pst"],
-    accept_multiple_files=True
-)
+    ## 📋 ANÁLISE TÉCNICA
+    [Apresente os indicadores técnicos encontrados de forma objetiva]
 
-if new_files:
-    for f in new_files:
-        if f.name not in [x['name'] for x in st.session_state.arquivos_acumulados]:
-            st.session_state.arquivos_acumulados.append({
-                'name': f.name, 
-                'content': f.read(), 
-                'type': f.type
-            })
+    ## ⚠️ RECOMENDAÇÕES
+    [Liste as ações recomendadas]
 
-# Exibir miniaturas
-if st.session_state.arquivos_acumulados:
-    st.write("📦 **Mesa de Perícia (Provas Carregadas):**")
-    cols = st.columns(min(4, len(st.session_state.arquivos_acumulados)))
-    for i, f in enumerate(st.session_state.arquivos_acumulados):
-        with cols[i % 4]:
-            if f['type'].startswith('image'):
-                st.image(Image.open(io.BytesIO(f['content'])), width=150, use_column_width=True)
-            st.caption(f"✅ {f['name'][:20]}...")
+    ---
 
-st.markdown("---")
+    REGRAS CRÍTICAS:
+    1. SEMPRE comece com o VEREDITO FINAL em destaque
+    2. Seja CONCLUSIVO - evite "pode ser", "talvez", "possivelmente" no veredito
+    3. Se for fraude, diga FRAUDE CONFIRMADA
+    4. Se houver dúvidas sérias, diga POSSÍVEL FRAUDE ou ATENÇÃO
+    5. Analise TODO o conteúdo fornecido, não apenas metadados
+    """
 
-# 7. HISTÓRICO PERICIAL
-st.subheader("🕵️ Linha de Investigação")
-for bloco in st.session_state.historico_pericial:
-    st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
+    if tipo_arquivo in ["image/jpeg", "image/png", "image/jpg"]:
+        return prompt_base + """
 
-# 8. CAMPO DE PERGUNTA
-user_query = st.text_area(
-    "📝 Pergunta ao Perito:",
-    key="campo_pergunta",
-    placeholder="Ex: 'Analise a textura de pele e sombras desta face' ou 'Verifique os registros SPF/DKIM deste e-mail'",
-    height=120
-)
+        ANÁLISE ESPECÍFICA PARA IMAGENS:
 
-# 9. FUNÇÃO GERADORA DE PDF
-def gerar_pdf_pericial(conteudo, data_f):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 15, txt="LAUDO TÉCNICO PERICIAL - AUDITIA", ln=True, align='C')
-    pdf.set_font("Arial", size=10)
-    pdf.cell(200, 10, txt=f"Data da Perícia: {data_f}", ln=True, align='C')
-    pdf.ln(10)
-    pdf.set_font("Arial", size=11)
-    texto_limpo = conteudo.encode('latin-1', 'replace').decode('latin-1')
-    pdf.multi_cell(0, 8, txt=texto_limpo)
-    return pdf.output(dest='S').encode('latin-1')
+        Verifique rigorosamente:
+        1. **Artefatos de IA/Deepfake**: Texturas irreais, anatomia incorreta, iluminação inconsistente
+        2. **Manipulações digitais**: Clonagem, edição, montagem
+        3. **Contexto visual**: Coerência da cena, reflexos, sombras
+        4. **Metadados**: EXIF, software de edição usado
 
-# 10. FUNÇÃO PARA EXTRAIR CONTEÚDO COMPLETO DE E-MAIL EML
-def extrair_conteudo_eml(content_bytes):
-    """Extrai cabeçalhos completos e corpo de e-mail EML"""
+        Se detectar sinais de IA ou manipulação significativos: CLASSIFICAÇÃO: ATENÇÃO ou POSSÍVEL FRAUDE
+        Se for claramente manipulado para enganar: CLASSIFICAÇÃO: FRAUDE CONFIRMADA
+        """
+
+    elif tipo_arquivo == "message/rfc822" or "eml" in tipo_arquivo.lower():
+        return prompt_base + """
+
+        ANÁLISE ESPECÍFICA PARA E-MAILS:
+
+        Verifique rigorosamente:
+        1. **Conteúdo da mensagem**: Linguagem de urgência, ameaças, promessas irreais
+        2. **Remetente**: Domínio genérico, nome suspeito, inconsistências
+        3. **Técnicas de phishing**: Links suspeitos, anexos maliciosos, spoofing
+        4. **Autenticação**: SPF, DKIM, DMARC (se disponíveis)
+        5. **Contexto psicológico**: Manipulação emocional, engenharia social
+
+        IMPORTANTE: Analise SEMPRE o conteúdo completo do e-mail, não apenas cabeçalhos!
+
+        Se for phishing claro: CLASSIFICAÇÃO: FRAUDE CONFIRMADA
+        Se houver múltiplos indicadores suspeitos: CLASSIFICAÇÃO: POSSÍVEL FRAUDE
+        Se houver alguns sinais de alerta: CLASSIFICAÇÃO: ATENÇÃO
+        """
+
+    elif tipo_arquivo == "application/pdf":
+        return prompt_base + """
+
+        ANÁLISE ESPECÍFICA PARA PDFs:
+
+        Verifique:
+        1. **Conteúdo**: Autenticidade de documentos, consistência de informações
+        2. **Formatação**: Fontes inconsistentes, alinhamento suspeito
+        3. **Metadados**: Autor, software criador, histórico de edições
+        4. **Elementos visuais**: Logos, assinaturas, carimbos (verificar autenticidade)
+        """
+
+    return prompt_base
+
+# ==================== FUNÇÕES DE ANÁLISE ====================
+def analisar_imagem(image, pergunta_usuario=""):
+    """Análise de imagem com prompt otimizado"""
     try:
-        # Parsear o e-mail completo
-        msg = email.message_from_bytes(content_bytes, policy=policy.default)
-        
-        # Extrair cabeçalhos importantes
-        remetente = msg.get('From', 'Não disponível')
-        destinatario = msg.get('To', 'Não disponível')
-        assunto = msg.get('Subject', 'Sem assunto')
-        data_envio = msg.get('Date', 'Não disponível')
-        cc = msg.get('Cc', 'Não disponível')
-        
-        # Extrair cabeçalhos de autenticação
-        spf = msg.get('Received-SPF', 'Não disponível')
-        dkim = msg.get('DKIM-Signature', 'Não disponível')
-        dmarc = msg.get('DMARC-Status', 'Não disponível')
-        
+        # Redimensionar imagem para otimizar processamento
+        img = Image.open(image)
+        img.thumbnail((1024, 1024))
+
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        prompt = obter_prompt_analise("image/jpeg")
+
+        if pergunta_usuario:
+            prompt += f"\n\nPERGUNTA DO USUÁRIO: {pergunta_usuario}"
+
+        resposta = model.generate_content([prompt, img])
+        return resposta.text
+    except Exception as e:
+        return f"❌ Erro na análise de imagem: {str(e)}"
+
+def analisar_email(arquivo_email, pergunta_usuario=""):
+    """Análise de e-mail com foco em conteúdo e contexto"""
+    try:
+        msg = BytesParser(policy=policy.default).parsebytes(arquivo_email.getvalue())
+
+        # Extrair informações completas
+        remetente = msg.get("From", "Não identificado")
+        destinatario = msg.get("To", "Não identificado")
+        assunto = msg.get("Subject", "Sem assunto")
+        data = msg.get("Date", "Sem data")
+
         # Extrair corpo do e-mail
         corpo = ""
         if msg.is_multipart():
             for part in msg.walk():
-                content_type = part.get_content_type()
-                content_disposition = str(part.get("Content-Disposition"))
-                
-                # Extrair texto
-                if content_type == "text/plain" and "attachment" not in content_disposition:
-                    try:
-                        corpo = part.get_payload(decode=True).decode('utf-8', errors='ignore')
-                        break
-                    except:
-                        pass
+                if part.get_content_type() == "text/plain":
+                    corpo = part.get_payload(decode=True).decode(errors="ignore")
+                    break
         else:
-            # E-mail não multipart
-            try:
-                corpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
-            except:
-                corpo = msg.get_payload()
-        
-        # Montar conteúdo completo para análise
-        conteudo_completo = f"""
-        E-MAIL COMPLETO - ANÁLISE FORENSE
-        
-        METADADOS:
+            corpo = msg.get_payload(decode=True).decode(errors="ignore")
+
+        # Extrair cabeçalhos de autenticação
+        spf = msg.get("Received-SPF", "Não disponível")
+        dkim = msg.get("DKIM-Signature", "Não disponível")
+
+        # Montar contexto completo
+        contexto = f"""
+        === DADOS DO E-MAIL ===
         Remetente: {remetente}
         Destinatário: {destinatario}
         Assunto: {assunto}
-        Data de Envio: {data_envio}
-        CC: {cc}
-        
-        REGISTROS DE SEGURANÇA:
+        Data: {data}
+
+        === CONTEÚDO DA MENSAGEM ===
+        {corpo[:2000]}  # Limitar para não exceder tokens
+
+        === AUTENTICAÇÃO ===
         SPF: {spf}
-        DKIM: {dkim}
-        DMARC: {dmarc}
-        
-        CORPO DA MENSAGEM:
-        {corpo}
+        DKIM: {'Presente' if 'não disponível' not in dkim.lower() else 'Ausente'}
         """
-        
-        return conteudo_completo.strip()
-        
-    except Exception as e:
-        return f"E-MAIL (Erro na extração: {str(e)}): {content_bytes[:500]}..."
 
-# 11. FUNÇÃO PARA EXTRAIR CONTEÚDO DE PST (simplificado para esta versão)
-def extrair_conteudo_pst(content_bytes):
-    """Extrai conteúdo básico de arquivo PST"""
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        prompt = obter_prompt_analise("message/rfc822") + f"\n\n{contexto}"
+
+        if pergunta_usuario:
+            prompt += f"\n\nPERGUNTA DO USUÁRIO: {pergunta_usuario}"
+
+        resposta = model.generate_content(prompt)
+        return resposta.text
+    except Exception as e:
+        return f"❌ Erro na análise de e-mail: {str(e)}"
+
+def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
+    """Análise de PDF"""
     try:
-        # Para PST, retornamos informação básica
-        # Em versão completa, usaria biblioteca como pypff
-        return f"""
-        ARQUIVO PST - ANÁLISE FORENSE
-        
-        Tipo: Arquivo de dados do Outlook (.pst)
-        Tamanho: {len(content_bytes)} bytes
-        
-        Nota: Este arquivo contém e-mails, contatos e calendários.
-        Para análise completa, utilize ferramentas especializadas como pypff ou libpff.
-        """
+        # Converter PDF em imagens para análise visual
+        from pdf2image import pdfinfo_from_bytes, convert_from_bytes
+
+        info = pdfinfo_from_bytes(arquivo_pdf.getvalue())
+        primeira_pagina = convert_from_bytes(arquivo_pdf.getvalue(), first_page=1, last_page=1)[0]
+
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        prompt = obter_prompt_analise("application/pdf")
+
+        if pergunta_usuario:
+            prompt += f"\n\nPERGUNTA DO USUÁRIO: {pergunta_usuario}"
+
+        resposta = model.generate_content([prompt, primeira_pagina])
+        return resposta.text
     except Exception as e:
-        return f"PST (Erro: {str(e)}): Arquivo de dados do Outlook"
+        return f"❌ Erro na análise de PDF: {str(e)}"
 
-# 12. MOTOR PERICIAL COM ANÁLISE INDIVIDUAL E CRUZADA
-col1, col2 = st.columns([1, 1])
+# ==================== INTERFACE PRINCIPAL ====================
 
-with col1:
-    if st.button("🚀 EXECUTAR PERÍCIA", on_click=processar_pericia):
-        pergunta_efetiva = st.session_state.get('pergunta_ativa', '').strip()
-        
-        if not pergunta_efetiva and not st.session_state.arquivos_acumulados:
-            st.warning("⚠️ Insira material para análise ou uma pergunta específica.")
-        else:
-            tz_br = pytz.timezone('America/Sao_Paulo')
-            agora = datetime.now(tz_br).strftime("%d/%m/%Y às %H:%M:%S")
-            
-            with st.spinner("🕵️ AuditIA realizando auditoria técnica profunda..."):
-                try:
-                    # DETERMINAR OS TIPOS DE ARQUIVOS PARA ANÁLISE ESPECIALIZADA
-                    tipos_arquivos = [f['type'] for f in st.session_state.arquivos_acumulados]
-                    nomes_arquivos = [f['name'].lower() for f in st.session_state.arquivos_acumulados]
-                    
-                    tem_imagem = any(t.startswith('image') for t in tipos_arquivos)
-                    tem_email = any('.eml' in n or '.pst' in n for n in nomes_arquivos)
-                    tem_pdf = any(t == 'application/pdf' for t in tipos_arquivos)
-                    
-                    # INSTRUÇÃO COM PROTOCOLO ESPECIALIZADO
-                    instrucao = f"""
-                    Aja como o AuditIA, inteligência forense de elite para e-discovery. Hoje é {agora}.
-                    
-                    📋 PROTOCOLO DE ANÁLISE MULTIMODAL:
-                    """
-                    
-                    if tem_imagem:
-                        instrucao += """
-                    🖼️ ANÁLISE DE IMAGENS (Protocolo V16):
-                    1. IMAGENS DE PESSOAS: Analise com CETICISMO MÁXIMO - QUALQUER ANOMALIA ANATÔMICA INDICA FRAUDE
-                    2. ANATOMIA: Verifique fusão de dedos, articulações, dentes e simetria facial - QUALQUER INCONSISTÊNCIA = FRAUDE
-                    3. FÍSICA DA LUZ: Observe reflexos oculares e sombras (devem ter fonte única) - INCONSISTÊNCIA = FRAUDE
-                    4. TEXTURA DE PELE: Identifique "perfeição plástica" ou ausência de poros/ruído digital - PRESENÇA = FRAUDE
-                    5. METADADOS: Se não houver EXIF ou rastro de sensor, classifique como "ATENÇÃO (ALTA PROBABILIDADE DE IA)"
-                    6. NUNCA classifique como "IMAGENS REAIS" quando houver qualquer indício de IA
-                    7. Se detectar QUALQUER característica típica de IA, classifique como "FRAUDE CONFIRMADA"
-                    """
-                    
-                    if tem_email:
-                        instrucao += """
-                    📧 ANÁLISE DE E-MAILS (Protocolo e-Discovery):
-                    1. METADADOS: Verifique remetente, destinatário, servidores de e-mail, timestamps
-                    2. REGISTROS DE SEGURANÇA: Analise SPF, DKIM e DMARC para autenticidade
-                    3. CONTEÚDO: Identifique padrões de phishing, links maliciosos, linguagem manipulativa
-                    4. ASSINATURAS: Verifique autenticidade das assinaturas digitais
-                    5. CLASSIFICAÇÃO: Use "SEGURO", "ATENÇÃO", "POSSÍVEL FRAUDE" ou "FRAUDE CONFIRMADA"
-                    6. NÃO MENCIONE ANALOGIAS DE IMAGENS (anatomia, física da luz, textura de pele)
-                    """
-                    
-                    if tem_pdf:
-                        instrucao += """
-                    📄 ANÁLISE DE PDFS (Protocolo Documental):
-                    1. METADADOS: Verifique autor, data de criação, software usado
-                    2. CONTEÚDO: Analise links, formulários e possíveis scripts maliciosos
-                    3. ASSINATURAS: Verifique autenticidade das assinaturas digitais
-                    4. CONSISTÊNCIA: Compare o conteúdo com o rastro digital deixado
-                    """
-                    
-                    instrucao += f"""
-                    🔄 ANÁLISE CRUZADA (Quando múltiplos arquivos):
-                    - Compare informações entre arquivos diferentes
-                    - Identifique contradições ou consistências
-                    - Relacione dados de diferentes fontes para conclusão forense
-                    
-                    🎯 ESTRUTURA OBRIGATÓRIA:
-                    - Inicie com 'PERGUNTA: "{pergunta_efetiva}"'
-                    - Seguido de 'CLASSIFICAÇÃO: [TIPO]'
-                    - EM SEGUIDA, 'VEREDITO: [TIPO]' (EX: VEREDITO: ATENÇÃO)
-                    - Em seguida, 'ANÁLISE RÁPIDA:' com os 3 pontos mais importantes
-                    - 'ANÁLISE DETALHADA:' com a análise completa
-                    - 'CONCLUSÃO FINAL:' com o veredito final e recomendações
-                    
-                    🚨 REGRAS DE CLASSIFICAÇÃO FINAL:
-                    - FRAUDE CONFIRMADA: Evidências claras de manipulação ou fraude
-                    - POSSÍVEL FRAUDE: Indícios fortes mas não conclusivos
-                    - ATENÇÃO: Inconsistências detectadas, requer investigação adicional
-                    - SEGURO: Nenhuma anomalia detectada
-                    
-                    🎯 NOSSOS 7 PILARES DE INVESTIGAÇÃO:
-                    1. Análise Documental (metadados e fontes)
-                    2. Detecção de IA (12 marcadores anatômicos)
-                    3. e-Discovery (.eml e .pst)
-                    4. Engenharia Social (phishing/spoofing)
-                    5. Física da Luz (reflexos e sombras)
-                    6. Ponzi Detection (promessas inconsistentes)
-                    7. Consistência Digital (rastro vs conteúdo)
-                    """
-                    
-                    contexto = [instrucao]
-                    
-                    # Adicionar histórico
-                    for h in st.session_state.historico_pericial:
-                        contexto.append(h)
-                    
-                    # Processar arquivos acumulados INDIVIDUALMENTE
-                    for f in st.session_state.arquivos_acumulados:
-                        nome_arq = f['name'].lower()
-                        
-                        if nome_arq.endswith('.eml'):
-                            # Extrair conteúdo completo do EML
-                            conteudo_eml = extrair_conteudo_eml(f['content'])
-                            contexto.append(f"ARQUIVO E-MAIL ({f['name']}):\n{conteudo_eml}")
-                        
-                        elif nome_arq.endswith('.pst'):
-                            # Extrair conteúdo básico do PST
-                            conteudo_pst = extrair_conteudo_pst(f['content'])
-                            contexto.append(f"ARQUIVO PST ({f['name']}):\n{conteudo_pst}")
-                        
-                        elif f['type'] == "application/pdf":
-                            # Enviar PDF para análise
-                            contexto.append({"mime_type": "application/pdf", "data": f['content']})
-                        
-                        else:
-                            # Imagens
-                            contexto.append(Image.open(io.BytesIO(f['content'])).convert('RGB'))
-                    
-                    # Adicionar pergunta do usuário
-                    contexto.append(pergunta_efetiva if pergunta_efetiva else "Analise todas as provas acima.")
-                    
-                    # Gerar resposta
-                    response = model.generate_content(contexto, request_options={"timeout": 600})
-                    
-                    # CORREÇÃO PÓS-PROCESSAMENTO
-                    resposta_texto = response.text
-                    
-                    # Forçar classificação correta para e-mails (remover menções a análise de imagens)
-                    if tem_email and not tem_imagem:
-                        # Remover padrões de análise de imagens em resposta de e-mail
-                        resposta_texto = re.sub(r"1\. IMAGENS DE PESSOAS:.*?(?=\n2\.|\n3\.|\n4\.|\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
-                        resposta_texto = re.sub(r"2\. ANATOMIA:.*?(?=\n3\.|\n4\.|\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
-                        resposta_texto = re.sub(r"3\. FÍSICA DA LUZ:.*?(?=\n4\.|\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
-                        resposta_texto = re.sub(r"4\. TEXTURA DE PELE:.*?(?=\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
-                        resposta_texto = re.sub(r"5\. METADADOS:.*?(?=\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
-                        
-                        # Forçar classificação adequada para e-mails
-                        if "VEREDITO:" not in resposta_texto.upper():
-                            # Adicionar veredito se não estiver presente
-                            if "CLASSIFICAÇÃO: ATENÇÃO" in resposta_texto.upper():
-                                resposta_texto = "VEREDITO: ATENÇÃO\n" + resposta_texto
-                            elif "CLASSIFICAÇÃO: SEGURO" in resposta_texto.upper():
-                                resposta_texto = "VEREDITO: SEGURO\n" + resposta_texto
-                            elif "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in resposta_texto.upper():
-                                resposta_texto = "VEREDITO: FRAUDE CONFIRMADA\n" + resposta_texto
-                            elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in resposta_texto.upper():
-                                resposta_texto = "VEREDITO: POSSÍVEL FRAUDE\n" + resposta_texto
-                        else:
-                            # Garantir que o veredito esteja no formato correto
-                            resposta_texto = re.sub(r"VEREDITO:\s*[A-Z]+", "VEREDITO: " + re.search(r"CLASSIFICAÇÃO:\s*([A-Z]+)", resposta_texto).group(1), resposta_texto)
-                    
-                    # Forçar classificação correta para imagens (evitar "imagens reais")
-                    if tem_imagem:
-                        if re.search(r'PROVAVELMENTE\s+IMAGENS?\s+REAIS|IMAGENS?\s+REAIS|CLASSIFICAÇÃO:\s*SEGURO', resposta_texto.upper()):
-                            # Forçar classificação correta para imagens com anomalias
-                            resposta_texto = resposta_texto.replace("PROVAVELMENTE IMAGENS REAIS", "FRAUDE CONFIRMADA")
-                            resposta_texto = resposta_texto.replace("IMAGENS REAIS", "FRAUDE CONFIRMADA")
-                            resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: SEGURO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
-                            resposta_texto = resposta_texto.replace("VEREDITO: SEGURO", "VEREDITO: FRAUDE CONFIRMADA")
-                            
-                            # Adicionar nota de correção
-                            if "CORREÇÃO AUTOMÁTICA" not in resposta_texto:
-                                resposta_texto += "\n\n⚠️ **CORREÇÃO AUTOMÁTICA DO PROTOCOLO V16**: O sistema detectou que a classificação original contraria os protocolos forenses. De acordo com o Protocolo V16, imagens com anomalias anatômicas, perfeição plástica ou ausência de metadados EXIF devem ser classificadas como FRAUDE CONFIRMADA."
-                        
-                        # Verificar se há "perfeição plástica" ou anomalias na resposta
-                        elif "perfeição plástica" in resposta_texto.lower() or "anomalia" in resposta_texto.lower() or "inconsistência" in resposta_texto.lower():
-                            # Se detectou anomalias mas não classificou como fraude, corrigir
-                            if "CLASSIFICAÇÃO:" in resposta_texto.upper() and "FRAUDE" not in resposta_texto.upper():
-                                resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: ATENÇÃO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
-                                resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
-                                resposta_texto = resposta_texto.replace("VEREDITO: ATENÇÃO", "VEREDITO: FRAUDE CONFIRMADA")
-                                resposta_texto = resposta_texto.replace("VEREDITO: POSSÍVEL FRAUDE", "VEREDITO: FRAUDE CONFIRMADA")
-                    
-                    # Garantir que a estrutura da resposta seja clara e objetiva
-                    if "ANÁLISE RÁPIDA:" not in resposta_texto:
-                        # Se não houver análise rápida, criar uma
-                        analise_rapida = ""
-                        
-                        if "FRAUDE CONFIRMADA" in resposta_texto.upper():
-                            analise_rapida = "ANÁLISE RÁPIDA:\n- Evidências claras de fraude detectadas\n- Indicadores irrefutáveis de manipulação\n- Recomenda-se investigação imediata"
-                        elif "POSSÍVEL FRAUDE" in resposta_texto.upper():
-                            analise_rapida = "ANÁLISE RÁPIDA:\n- Indícios fortes de possível fraude\n- Inconsistências significativas detectadas\n- Recomenda-se verificação adicional"
-                        elif "ATENÇÃO" in resposta_texto.upper():
-                            analise_rapida = "ANÁLISE RÁPIDA:\n- Inconsistências detectadas\n- Requer investigação adicional\n- Padrões suspeitos identificados"
-                        else:
-                            analise_rapida = "ANÁLISE RÁPIDA:\n- Nenhuma anomalia significativa detectada\n- Evidências consistentes com autenticidade\n- Classificação confirmada como seguro"
-                        
-                        # Inserir análise rápida na resposta
-                        resposta_texto = resposta_texto.replace("ANÁLISE DETALHADA:", analise_rapida + "\n\nANÁLISE DETALHADA:")
-                    
-                    st.session_state.historico_pericial.append(resposta_texto)
-                    st.rerun()
-                    
-                except Exception as e:
-                    if "exceeds the supported page limit" in str(e):
-                        st.error("⚠️ Limite de 1000 páginas excedido em algum PDF.")
-                    else:
-                        st.error(f"⚠️ Erro técnico: {e}. Tente novamente.")
+# Logo e cabeçalho
+st.image("https://via.placeholder.com/150x50/1e3a8a/ffffff?text=AuditIA", width=150)
+st.title("👁️ AuditIA - Inteligência Forense Digital")
+st.caption("Análise pericial automatizada com IA | Desenvolvido em Vargem Grande do Sul - SP")
 
-with col2:
-    if st.button("🗑️ LIMPAR CASO"):
-        st.session_state.historico_pericial = []
-        st.session_state.arquivos_acumulados = []
+# ==================== TERMO DE CONSENTIMENTO ====================
+with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES DE USAR", expanded=not st.session_state.termo_aceito):
+    st.markdown("""
+    <div class="termo-consentimento">
+    <h4>📜 Aviso Importante sobre o Uso do AuditIA</h4>
+
+    <p><strong>O AuditIA é uma ferramenta de apoio à análise forense digital</strong>, desenvolvida para auxiliar na identificação de fraudes, deepfakes, phishing e outras ameaças digitais. No entanto, é fundamental entender as seguintes condições:</p>
+
+    <h5>🎯 Propósito e Limitações</h5>
+    <ul>
+        <li><strong>Ferramenta de Apoio:</strong> O AuditIA fornece análises probabilísticas baseadas em inteligência artificial. Não substitui perícia oficial, análise humana especializada ou decisão judicial.</li>
+        <li><strong>Não é Infalível:</strong> Como qualquer sistema de IA, pode apresentar falsos positivos ou falsos negativos. Sempre busque confirmação adicional para decisões críticas.</li>
+        <li><strong>Uso Ético:</strong> Esta ferramenta deve ser usada exclusivamente para fins legítimos de segurança, auditoria e proteção contra fraudes.</li>
+    </ul>
+
+    <h5>⚠️ Responsabilidades do Usuário</h5>
+    <ul>
+        <li>Você é responsável pela interpretação e uso dos resultados fornecidos</li>
+        <li>Não use os laudos como única evidência em processos legais sem validação adicional</li>
+        <li>Respeite a privacidade e os direitos autorais ao analisar conteúdos</li>
+        <li>Não submeta dados sensíveis ou confidenciais sem autorização adequada</li>
+    </ul>
+
+    <h5>🔒 Privacidade e Dados</h5>
+    <ul>
+        <li>Arquivos analisados são processados temporariamente e não são armazenados permanentemente</li>
+        <li>Os resultados são gerados em tempo real e mantidos apenas durante sua sessão</li>
+        <li>Recomendamos não enviar informações pessoais sensíveis desnecessariamente</li>
+    </ul>
+
+    <h5>📞 Suporte e Desenvolvimento</h5>
+    <p>O AuditIA está em constante evolução. Para dúvidas, sugestões ou reportar problemas, entre em contato com a equipe de desenvolvimento.</p>
+
+    <p><strong>Desenvolvido em Vargem Grande do Sul - SP | Versão 2.0 - Fevereiro 2026</strong></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    aceite = st.checkbox(
+        "✅ Li e concordo com os termos acima. Estou ciente de que o AuditIA é uma ferramenta de apoio e não substitui análise especializada profissional.",
+        value=st.session_state.termo_aceito,
+        key="checkbox_termo"
+    )
+
+    if aceite and not st.session_state.termo_aceito:
+        st.session_state.termo_aceito = True
+        st.success("✅ Termo aceito! Você já pode usar o AuditIA.")
         st.rerun()
 
-# 13. DOWNLOAD DE LAUDO PDF
+# Bloquear uso se termo não foi aceito
+if not st.session_state.termo_aceito:
+    st.warning("⚠️ Por favor, leia e aceite o Termo de Consentimento acima para utilizar o AuditIA.")
+    st.stop()
+
+# ==================== GUIA DO USUÁRIO ====================
+with st.sidebar:
+    st.header("📚 Guia Completo de Uso")
+
+    with st.expander("🎯 O que é o AuditIA?"):
+        st.markdown("""
+        O **AuditIA** é uma plataforma de **Inteligência Forense Digital** que combina:
+
+        - 🤖 **IA Avançada** (Gemini 1.5 Pro)
+        - 🔍 **Análise Multimodal** (imagens, e-mails, PDFs)
+        - 🎭 **Psicologia Forense** (detecção de manipulação)
+        - 🔐 **Verificação Técnica** (metadados, autenticação)
+
+        **Desenvolvido para:**
+        - ✅ Auditores e peritos
+        - ✅ Profissionais de segurança
+        - ✅ Pessoas comuns que precisam verificar conteúdos suspeitos
+        """)
+
+    with st.expander("📤 Como Enviar Arquivos?"):
+        st.markdown("""
+        ### Formatos Suportados:
+
+        **Imagens:**
+        - 📸 JPG, JPEG, PNG
+        - Ideal para: prints de conversas, fotos, documentos digitalizados
+
+        **E-mails:**
+        - 📧 EML (e-mail individual)
+        - 📦 PST (arquivo Outlook)
+        - Ideal para: investigar phishing, verificar autenticidade
+
+        **Documentos:**
+        - 📄 PDF
+        - Ideal para: contratos, boletos, recibos
+
+        ### Dicas:
+        - 💡 Envie arquivos de alta qualidade
+        - 💡 Múltiplos arquivos podem ser analisados juntos
+        - 💡 Faça perguntas específicas para análises mais direcionadas
+        """)
+
+    with st.expander("🎨 Entenda as Cores"):
+        st.markdown("""
+        O AuditIA usa um **sistema de semáforo** para classificar riscos:
+
+        🔴 **VERMELHO - Fraude Confirmada**
+        - Golpe detectado com alta certeza
+        - Não prossiga com a transação
+        - Reporte às autoridades
+
+        🟠 **LARANJA - Possível Fraude**
+        - Múltiplos indicadores suspeitos
+        - Exercite extrema cautela
+        - Busque segunda opinião
+
+        🟡 **AMARELO - Atenção**
+        - Algumas inconsistências detectadas
+        - Análise adicional necessária
+        - Não confie cegamente
+
+        🟢 **VERDE - Seguro**
+        - Integridade confirmada
+        - Autenticidade provável
+        - Baixo risco de fraude
+
+        🔵 **AZUL - Informativo**
+        - Análise neutra
+        - Sem sinais claros de fraude
+        """)
+
+    with st.expander("🔍 Tipos de Análise"):
+        st.markdown("""
+        ### 1. Detecção de Deepfake/IA
+        - Identifica imagens geradas por IA
+        - Verifica anatomia, iluminação, texturas
+        - Detecta artefatos de processamento
+
+        ### 2. Análise de Phishing
+        - Examina linguagem manipulativa
+        - Verifica autenticidade do remetente
+        - Identifica técnicas de engenharia social
+
+        ### 3. Validação Documental
+        - Detecta edições e montagens
+        - Verifica consistência de fontes
+        - Analisa metadados ocultos
+
+        ### 4. Investigação de E-mails
+        - Verifica SPF, DKIM, DMARC
+        - Analisa cabeçalhos técnicos
+        - Examina conteúdo e contexto
+
+        ### 5. Análise de Esquemas Ponzi
+        - Identifica promessas irreais
+        - Detecta linguagem típica de pirâmides
+        - Avalia sustentabilidade de modelos de negócio
+        """)
+
+    with st.expander("⚡ Perguntas Frequentes"):
+        st.markdown("""
+        **Q: O AuditIA substitui um perito oficial?**
+        A: Não. É uma ferramenta de apoio para análise inicial.
+
+        **Q: Os resultados podem ser usados em processos legais?**
+        A: Recomendamos validação com perícia oficial para uso judicial.
+
+        **Q: Meus arquivos ficam armazenados?**
+        A: Não. Processamento é temporário e os dados não são salvos.
+
+        **Q: Qual a precisão das análises?**
+        A: Alta, mas não 100%. Sempre use julgamento crítico.
+
+        **Q: Posso analisar múltiplos arquivos?**
+        A: Sim! Envie vários arquivos relacionados ao mesmo caso.
+
+        **Q: Como reportar um problema?**
+        A: Entre em contato com a equipe de desenvolvimento.
+        """)
+
+    st.info("💡 **Dica:** Quanto mais contexto você fornecer, melhor será a análise!")
+
+# ==================== ÁREA DE UPLOAD ====================
+st.header("📂 Upload de Arquivos para Análise")
+
+arquivos = st.file_uploader(
+    "Selecione os arquivos para análise forense",
+    type=["jpg", "jpeg", "png", "pdf", "eml", "pst"],
+    accept_multiple_files=True,
+    help="Suporte para imagens, PDFs e e-mails (.eml, .pst)"
+)
+
+# Campo de pergunta
+pergunta = st.text_area(
+    "💬 Pergunta Específica (Opcional)",
+    placeholder="Ex: Este e-mail é legítimo? Esta imagem foi manipulada? Este documento é autêntico?",
+    key="campo_pergunta",
+    help="Faça perguntas específicas para direcionar a análise"
+)
+
+# Botões de ação organizados
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    analisar_btn = st.button("🔍 Analisar", use_container_width=True, on_click=processar_pericia)
+
+with col2:
+    limpar_btn = st.button("🗑️ Limpar Caso", use_container_width=True, on_click=iniciar_novo_caso)
+
+with col3:
+    exportar_btn = st.button("📥 Exportar PDF", use_container_width=True)
+
+# ==================== PROCESSAMENTO ====================
+if analisar_btn and arquivos:
+    with st.spinner("🔬 Realizando análise forense detalhada..."):
+        for arquivo in arquivos:
+            st.markdown(f"### 📄 Analisando: `{arquivo.name}`")
+
+            # Miniatura da imagem (se for imagem)
+            if arquivo.type.startswith("image/"):
+                img = Image.open(arquivo)
+                img.thumbnail((300, 300))
+                st.image(img, caption=arquivo.name, width=300)
+
+            # Processar análise
+            if arquivo.type in ["image/jpeg", "image/png", "image/jpg"]:
+                resultado = analisar_imagem(arquivo, st.session_state.pergunta_ativa)
+            elif arquivo.type == "message/rfc822" or arquivo.name.endswith(".eml"):
+                resultado = analisar_email(arquivo, st.session_state.pergunta_ativa)
+            elif arquivo.type == "application/pdf":
+                resultado = analisar_pdf(arquivo, st.session_state.pergunta_ativa)
+            else:
+                resultado = "❌ Formato de arquivo não suportado"
+
+            # Exibir resultado com estilo
+            html_resultado, cor = aplicar_estilo_pericial(resultado)
+            st.markdown(html_resultado, unsafe_allow_html=True)
+
+            # Adicionar ao histórico
+            st.session_state.historico_pericial.append({
+                "arquivo": arquivo.name,
+                "resultado": resultado,
+                "cor": cor,
+                "timestamp": datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+            })
+
+elif analisar_btn and not arquivos:
+    st.warning("⚠️ Por favor, envie pelo menos um arquivo para análise.")
+
+# ==================== HISTÓRICO ====================
 if st.session_state.historico_pericial:
     st.markdown("---")
-    tz_br = pytz.timezone('America/Sao_Paulo')
-    pdf_bytes = gerar_pdf_pericial(
-        st.session_state.historico_pericial[-1],
-        datetime.now(tz_br).strftime("%d/%m/%Y %H:%M")
-    )
-    st.download_button(
-        label="📥 Baixar Laudo da Última Análise (PDF)",
-        data=pdf_bytes,
-        file_name=f"Laudo_AuditIA_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-        mime="application/pdf"
-    )
+    st.header("📊 Histórico de Análises do Caso Atual")
 
-# 14. GUIA MESTRE AUDITIA
+    for i, item in enumerate(st.session_state.historico_pericial, 1):
+        with st.expander(f"🔎 Análise #{i} - {item['arquivo']} | {item['timestamp']}"):
+            html_hist, _ = aplicar_estilo_pericial(item['resultado'])
+            st.markdown(html_hist, unsafe_allow_html=True)
+
+# ==================== RODAPÉ ====================
 st.markdown("---")
-with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite"):
-    tab1, tab2, tab3 = st.tabs(["🎯 Nossos 7 Pilares", "🛠️ Como Usar", "❓ FAQ"])
-    
-    with tab1:
-        st.markdown("""
-        ### 🛡️ Nossos 7 Pilares de Investigação
-        
-        1. **Análise Documental**: Verificação profunda de fontes, metadados estruturais e selos digitais.
-        2. **Detecção de IA**: Scrutínio de 12 marcadores anatômicos (dedos, articulações, olhos) e texturas sintéticas.
-        3. **e-Discovery**: Processamento inteligente de arquivos .eml e .pst buscando intenções e fraudes.
-        4. **Engenharia Social**: Identificação de padrões comportamentais de phishing e spoofing.
-        5. **Física da Luz**: Verificação técnica de reflexos oculares e consistência de sombras.
-        6. **Ponzi Detection**: Avaliação de modelos de negócios com promessas financeiras inconsistentes.
-        7. **Consistência Digital**: Comparação entre o rastro digital e o conteúdo apresentado.
-        """)
-    
-    with tab2:
-        st.markdown("""
-        ### 🛠️ Manual de Perícia Profissional
-        
-        **Mesa de Perícia**: Adicione até 5 arquivos para uma auditoria conjunta e cruzada.
-        
-        **Pergunta ao Perito**: Seja cirúrgico!
-        - ❌ "Isso é real?" → Genérico
-        - ✅ "Analise a textura de pele e sombras desta face" → Específico
-        - ✅ "Verifique os registros SPF/DKIM deste e-mail" → Específico
-        
-        **Interpretando o Termômetro**:
-        - 🟢 **Verde**: Autenticidade confirmada com rastro EXIF/físico
-        - 🔵 **Azul**: Documento informativo legítimo mas neutro
-        - 🟡 **Amarelo**: Imagem sem rastro de sensor digital (Atenção!)
-        - 🟠 **Laranja**: Inconsistências técnicas graves detectadas
-        - 🔴 **Vermelho**: Fraude ou manipulação confirmada
-        """)
-    
-    with tab3:
-        st.markdown("""
-        **Q: Por que o AuditIA foi criado?**
-        R: Para fornecer ferramentas técnicas a advogados, auditores e peritos contra fraudes geradas por IA.
-        
-        **Q: Como funciona a análise de fotos de pessoas?**
-        R: Executamos o Protocolo V16, analisando mãos, dentes, reflexos oculares em busca de "perfeição plástica" característica da IA.
-        
-        **Q: Como funciona a análise de e-mails?**
-        R: Verificamos metadados (remetente, destinatário, data), registros SPF/DKIM/DMARC, padrões de phishing e assinaturas digitais.
-        
-        **Q: O que é análise cruzada?**
-        R: Quando você carrega múltiplos arquivos, o sistema compara informações entre eles para identificar contradições ou consistências.
-        
-        **Q: Qual o tamanho máximo dos arquivos?**
-        R: Até 200MB individuais, totalizando 1GB por sessão pericial.
-        
-        **Q: O sistema guarda meu histórico?**
-        R: Não. Ao clicar em 'Limpar Caso', toda a memória é destruída permanentemente.
-        """)
-
-st.caption(f"AuditIA © {datetime.now().year} - Tecnologia e Segurança Digital | Vargem Grande do Sul - SP")
+st.caption("👁️ AuditIA v2.0 | Desenvolvido em Vargem Grande do Sul - SP | © 2026")
+st.caption("⚖️ Ferramenta de apoio - Não substitui perícia oficial")
