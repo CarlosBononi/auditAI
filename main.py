@@ -19,10 +19,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Configurar API do Gemini
+# Configurar API do Gemini com detecção automática de modelos
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # Detectar modelo disponível automaticamente
     modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     MODELO_USAR = modelos_disponiveis[0] if modelos_disponiveis else 'gemini-1.5-flash'
 except Exception as e:
@@ -31,22 +30,34 @@ except Exception as e:
     st.stop()
 
 # ==================== ESTILO CUSTOMIZADO ====================
-st.markdown("""
+st.markdown('''
 <style>
     /* Cores baseadas na logo */
     :root {
-        --verde-logo: #c8e6c9;
-        --verde-escuro: #66bb6a;
+        --verde-logo: #8BC34A;
+        --cinza-escuro: #424242;
         --cinza-claro: #e0e0e0;
-        --cinza-medio: #757575;
     }
 
-    /* Sidebar com fundo verde claro */
+    /* Fundo BRANCO mantido */
+    .main {
+        background-color: white;
+    }
+
+    /* Sidebar com fundo cinza escuro e texto verde */
     [data-testid="stSidebar"] {
-        background-color: #e8f5e9;
+        background-color: var(--cinza-escuro);
     }
 
-    /* Botões com cinza claro */
+    [data-testid="stSidebar"] * {
+        color: var(--verde-logo) !important;
+    }
+
+    [data-testid="stSidebar"] .stMarkdown {
+        color: var(--verde-logo) !important;
+    }
+
+    /* Botões harmonizados */
     .stButton > button {
         width: 100%;
         padding: 0.5rem 1rem;
@@ -54,28 +65,46 @@ st.markdown("""
         font-weight: 500;
         transition: all 0.3s;
         margin: 0.25rem 0;
-        background-color: #e0e0e0;
+    }
+
+    /* Botão Analisar - verde destacado */
+    div[data-testid="column"]:first-child .stButton > button {
+        background-color: var(--verde-logo);
+        color: white;
+        border: 2px solid var(--verde-logo);
+    }
+
+    div[data-testid="column"]:first-child .stButton > button:hover {
+        background-color: #7CB342;
+        border-color: #7CB342;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 195, 74, 0.3);
+    }
+
+    /* Botão Limpar - cinza claro */
+    div[data-testid="column"]:nth-child(2) .stButton > button {
+        background-color: var(--cinza-claro);
         color: #424242;
         border: 2px solid #bdbdbd;
     }
 
-    .stButton > button:hover {
-        background-color: #bdbdbd;
-        border-color: #9e9e9e;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-    /* Botão Analisar destacado */
-    div[data-testid="column"]:first-child .stButton > button {
-        background-color: #66bb6a;
+    div[data-testid="column"]:nth-child(2) .stButton > button:hover {
+        background-color: #d32f2f;
+        border-color: #d32f2f;
         color: white;
-        border-color: #66bb6a;
     }
 
-    div[data-testid="column"]:first-child .stButton > button:hover {
-        background-color: #4caf50;
-        border-color: #4caf50;
+    /* Botão Exportar - cinza claro */
+    div[data-testid="column"]:nth-child(3) .stButton > button {
+        background-color: var(--cinza-claro);
+        color: #424242;
+        border: 2px solid #bdbdbd;
+    }
+
+    div[data-testid="column"]:nth-child(3) .stButton > button:hover {
+        background-color: #1976d2;
+        border-color: #1976d2;
+        color: white;
     }
 
     /* Redimensionar imagens anexadas */
@@ -87,69 +116,115 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    /* Termo de consentimento com fundo verde claro */
+    /* Termo de consentimento - cinza escuro com texto verde */
     .termo-consentimento {
-        background-color: #e8f5e9;
-        border-left: 4px solid #66bb6a;
+        background-color: var(--cinza-escuro);
+        color: var(--verde-logo);
+        border-left: 4px solid var(--verde-logo);
         padding: 1.5rem;
         border-radius: 8px;
         margin: 1rem 0;
     }
 
-    /* Checkbox do termo com fundo verde */
+    .termo-consentimento h4,
+    .termo-consentimento h5,
+    .termo-consentimento p,
+    .termo-consentimento ul,
+    .termo-consentimento li {
+        color: var(--verde-logo) !important;
+    }
+
+    /* Checkbox do termo - cinza escuro */
     .stCheckbox {
         padding: 1rem;
-        background-color: #f1f8e9;
+        background-color: var(--cinza-escuro);
         border-radius: 8px;
         margin: 1rem 0;
     }
 
-    /* Caixas de texto com fundo verde claro */
-    .stTextArea textarea,
-    .stTextInput input {
-        background-color: #f1f8e9 !important;
-        border-color: #c5e1a5 !important;
+    .stCheckbox label {
+        color: var(--verde-logo) !important;
     }
 
-    /* Área de upload com fundo verde claro */
+    /* Caixas de texto - cinza escuro com texto verde */
+    .stTextArea textarea {
+        background-color: var(--cinza-escuro) !important;
+        color: var(--verde-logo) !important;
+        border: 2px solid var(--verde-logo) !important;
+    }
+
+    .stTextArea label {
+        color: #424242 !important;
+    }
+
+    /* Área de upload - cinza escuro com borda verde */
     [data-testid="stFileUploader"] {
-        background-color: #f1f8e9;
+        background-color: var(--cinza-escuro);
+        border: 2px solid var(--verde-logo);
         border-radius: 8px;
         padding: 1rem;
     }
 
-    /* Ajustar tamanho do subtítulo */
+    [data-testid="stFileUploader"] label,
+    [data-testid="stFileUploader"] span {
+        color: var(--verde-logo) !important;
+    }
+
+    /* Subtítulo pequeno */
     .subtitle-custom {
         font-size: 0.9rem;
         color: #64748b;
         font-weight: 400;
         margin-top: -0.5rem;
         margin-bottom: 1.5rem;
+        text-align: center;
     }
 
-    /* Diminuir título Upload de Arquivos */
+    /* Título "Upload de Arquivos" = tamanho "Analisando" */
     h1 {
-        font-size: 1.8rem !important;
+        font-size: 1.1rem !important;
+        font-weight: 500 !important;
     }
 
-    /* Estilo para veredito em destaque */
+    /* VEREDITO FINAL e CLASSIFICAÇÃO maiores e em NEGRITO */
     .veredito-destaque {
-        font-size: 1.3rem;
-        font-weight: 700;
-        margin: 1rem 0;
+        font-size: 1.6rem !important;
+        font-weight: 800 !important;
+        line-height: 1.3;
     }
 
-    /* Resumo final */
+    .classificacao-destaque {
+        font-size: 1.3rem !important;
+        font-weight: 800 !important;
+    }
+
+    /* Resumo final - cinza escuro com texto verde */
     .resumo-final {
-        background-color: #f5f5f5;
-        border-left: 4px solid #66bb6a;
+        background-color: var(--cinza-escuro);
+        border-left: 4px solid var(--verde-logo);
         padding: 1.5rem;
         border-radius: 8px;
         margin: 1.5rem 0;
-        font-size: 1.05rem;
+        color: var(--verde-logo);
+    }
+
+    .resumo-final strong {
+        color: #7CB342;
+        font-size: 1.1rem;
+    }
+
+    /* Info/Dica em cinza claro */
+    .stAlert {
+        background-color: var(--cinza-claro) !important;
+        color: #424242 !important;
+        border-left: 4px solid #9e9e9e !important;
+    }
+
+    .stAlert [data-testid="stMarkdownContainer"] {
+        color: #424242 !important;
     }
 </style>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
 # ==================== GESTÃO DE SESSÃO ====================
 if "historico_pericial" not in st.session_state:
@@ -164,7 +239,7 @@ if "caso_id" not in st.session_state:
     st.session_state.caso_id = None
 
 def iniciar_novo_caso():
-    """Limpa completamente o caso e inicia um novo"""
+    '''Limpa completamente o caso e inicia um novo'''
     st.session_state.historico_pericial = []
     st.session_state.arquivos_acumulados = []
     st.session_state.pergunta_ativa = ""
@@ -172,81 +247,76 @@ def iniciar_novo_caso():
     st.rerun()
 
 def processar_pericia():
-    """Captura a pergunta antes do rerun"""
+    '''Captura a pergunta antes do rerun'''
     st.session_state.pergunta_ativa = st.session_state.campo_pergunta
     st.session_state.campo_pergunta = ""
 
 # ==================== SISTEMA DE CORES INTELIGENTE ====================
 def aplicar_estilo_pericial(texto):
-    """
-    Sistema de classificação visual com hierarquia clara
-    """
+    '''Sistema de classificação visual com hierarquia clara'''
     texto_upper = texto.upper()
 
-    # Hierarquia de detecção
-    if any(term in texto_upper for term in [
+    # Detecção com prioridade para SEGURO primeiro
+    if "CLASSIFICAÇÃO: SEGURO" in texto_upper or "VEREDITO: SEGURO" in texto_upper:
+        cor, font = "#388e3c", "white"  # 🟢 VERDE
+        nivel = "SEGURO"
+    elif any(term in texto_upper for term in [
         "CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "VEREDITO: FRAUDE CONFIRMADA",
         "GOLPE CONFIRMADO", "SCAM CONFIRMADO", "FRAUDE CONFIRMADA"
     ]):
         cor, font = "#d32f2f", "white"  # 🔴 VERMELHO
         nivel = "FRAUDE CONFIRMADA"
-
     elif any(term in texto_upper for term in [
         "CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "VEREDITO: POSSÍVEL FRAUDE",
         "ALTA ATENÇÃO", "MUITO SUSPEITO", "PHISHING", "POSSÍVEL FRAUDE"
     ]):
         cor, font = "#f57c00", "white"  # 🟠 LARANJA
         nivel = "POSSÍVEL FRAUDE"
-
     elif any(term in texto_upper for term in [
         "CLASSIFICAÇÃO: ATENÇÃO", "VEREDITO: ATENÇÃO",
         "SUSPEITO", "ANÁLISE NECESSÁRIA", "INCONSISTÊNCIAS"
     ]):
         cor, font = "#fbc02d", "black"  # 🟡 AMARELO
         nivel = "ATENÇÃO"
-
-    elif any(term in texto_upper for term in [
-        "CLASSIFICAÇÃO: SEGURO", "VEREDITO: SEGURO",
-        "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"
-    ]):
-        cor, font = "#388e3c", "white"  # 🟢 VERDE
-        nivel = "SEGURO"
-
     else:
         cor, font = "#1976d2", "white"  # 🔵 AZUL
         nivel = "INFORMATIVO"
 
-    return f"""
+    # Aplicar negrito e tamanho maior para VEREDITO e CLASSIFICAÇÃO
+    texto_formatado = texto
+    texto_formatado = texto_formatado.replace(
+        "## 🎯 VEREDITO FINAL", 
+        '<div class="veredito-destaque">🎯 VEREDITO FINAL</div>'
+    )
+    texto_formatado = texto_formatado.replace(
+        "**CLASSIFICAÇÃO:", 
+        '<div class="classificacao-destaque"><strong>CLASSIFICAÇÃO:'
+    )
+    if '<div class="classificacao-destaque">' in texto_formatado:
+        texto_formatado = texto_formatado.replace("**", "</strong></div>", 1)
+
+    return f'''
     <div style="background-color: {cor}; color: {font}; padding: 1.5rem; 
                 border-radius: 12px; margin: 1rem 0; 
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-        {texto.replace(chr(10), '<br>')}
+        {texto_formatado.replace(chr(10), '<br>')}
     </div>
-    """, cor, nivel
+    ''', cor, nivel
 
-def extrair_resumo(texto, nivel):
-    """Extrai resumo do veredito"""
-    linhas = texto.split('\n')
-    resumo = ""
-
-    # Pegar as primeiras linhas após o veredito
-    capturar = False
-    contador = 0
-    for linha in linhas:
-        if "VEREDITO FINAL" in linha.upper() or "CLASSIFICAÇÃO:" in linha.upper():
-            capturar = True
-            continue
-        if capturar and linha.strip() and not linha.startswith('#'):
-            resumo += linha.strip() + " "
-            contador += 1
-            if contador >= 3:  # Pegar até 3 linhas
-                break
-
-    return resumo[:300] if resumo else "Análise concluída. Veja detalhes acima."
+def extrair_resumo(nivel):
+    '''Extrai resumo COERENTE baseado apenas no nível'''
+    resumos = {
+        "SEGURO": "Este conteúdo foi avaliado como legítimo, com forte indicação de autenticidade e ausência de sinais relevantes de fraude ou phishing.",
+        "FRAUDE CONFIRMADA": "Foram identificados múltiplos sinais objetivos de fraude, configurando golpe confirmado. Recomenda-se não prosseguir e adotar medidas de segurança imediatas.",
+        "POSSÍVEL FRAUDE": "Existem vários elementos suspeitos que indicam possível fraude. É recomendável tratar esta comunicação com extrema cautela e buscar validação independente.",
+        "ATENÇÃO": "Foram observados alguns pontos de atenção que exigem verificação adicional antes de confiar totalmente neste conteúdo.",
+        "INFORMATIVO": "Análise informativa concluída. Não foram identificados elementos suficientes para classificar como fraude ou como totalmente seguro."
+    }
+    return resumos.get(nivel, "Análise concluída. Veja detalhes acima.")
 
 # ==================== PROMPTS OTIMIZADOS ====================
 def obter_prompt_analise(tipo_arquivo):
-    """Retorna prompts equilibrados entre técnico e acessível"""
+    '''Retorna prompts equilibrados entre técnico e acessível'''
 
     prompt_base = """
     Você é um especialista em análise forense digital. Sua análise deve ser:
@@ -327,7 +397,7 @@ def obter_prompt_analise(tipo_arquivo):
 
 # ==================== FUNÇÕES DE ANÁLISE ====================
 def analisar_imagem(image, pergunta_usuario=""):
-    """Análise de imagem com prompt otimizado"""
+    '''Análise de imagem com prompt otimizado'''
     try:
         img = Image.open(image)
         img.thumbnail((1024, 1024))
@@ -344,7 +414,7 @@ def analisar_imagem(image, pergunta_usuario=""):
         return f"❌ Erro na análise de imagem: {str(e)}"
 
 def analisar_email(arquivo_email, pergunta_usuario=""):
-    """Análise de e-mail com foco em conteúdo e contexto"""
+    '''Análise de e-mail com foco em conteúdo e contexto'''
     try:
         msg = BytesParser(policy=policy.default).parsebytes(arquivo_email.getvalue())
 
@@ -392,7 +462,7 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
         return f"❌ Erro na análise de e-mail: {str(e)}"
 
 def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
-    """Análise de PDF"""
+    '''Análise de PDF'''
     try:
         model = genai.GenerativeModel(MODELO_USAR)
         prompt = obter_prompt_analise("application/pdf")
@@ -407,18 +477,18 @@ def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
 
 # ==================== INTERFACE PRINCIPAL ====================
 
-# Logo GRANDE (1000px)
+# Logo GRANDE (800px) - DOBRO DO TAMANHO
 try:
     if os.path.exists("Logo_AI_1.png"):
         logo = Image.open("Logo_AI_1.png")
-        st.image(logo, width=1000)
+        st.image(logo, width=800)
 except:
-    pass
+    st.markdown("# 👁️ AuditIA")
 
-# Subtítulo pequeno
-st.markdown('<p class="subtitle-custom">Inteligência Forense Digital | Desenvolvido em Vargem Grande do Sul - SP</p>', unsafe_allow_html=True)
+# Subtítulo APENAS "Inteligência Forense Digital"
+st.markdown('<p class="subtitle-custom">Inteligência Forense Digital</p>', unsafe_allow_html=True)
 
-# ==================== TERMO DE CONSENTIMENTO ====================
+# ==================== TERMO DE CONSENTIMENTO (TOPO - OBRIGATÓRIO) ====================
 with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES DE USAR", expanded=not st.session_state.termo_aceito):
     st.markdown("""
     <div class="termo-consentimento">
@@ -466,11 +536,12 @@ with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES 
         st.success("✅ Termo aceito! Você já pode usar o AuditIA.")
         st.rerun()
 
+# Bloquear uso se termo não foi aceito
 if not st.session_state.termo_aceito:
     st.warning("⚠️ Por favor, leia e aceite o Termo de Consentimento acima para utilizar o AuditIA.")
     st.stop()
 
-# ==================== GUIA DO USUÁRIO ====================
+# ==================== GUIA DO USUÁRIO (SIDEBAR) ====================
 with st.sidebar:
     st.header("📚 Guia Completo de Uso")
 
@@ -602,6 +673,7 @@ arquivos = st.file_uploader(
     help="Suporte para imagens, PDFs e e-mails (.eml, .pst)"
 )
 
+# Campo de pergunta
 pergunta = st.text_area(
     "💬 Pergunta Específica (Opcional)",
     placeholder="Ex: Este e-mail é legítimo? Esta imagem foi manipulada? Este documento é autêntico?",
@@ -609,6 +681,7 @@ pergunta = st.text_area(
     help="Faça perguntas específicas para direcionar a análise"
 )
 
+# Botões de ação organizados
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -626,11 +699,13 @@ if analisar_btn and arquivos:
         for arquivo in arquivos:
             st.markdown(f"### 📄 Analisando: `{arquivo.name}`")
 
+            # Miniatura da imagem (se for imagem)
             if arquivo.type.startswith("image/"):
                 img = Image.open(arquivo)
                 img.thumbnail((300, 300))
                 st.image(img, caption=arquivo.name, width=300)
 
+            # Processar análise
             if arquivo.type in ["image/jpeg", "image/png", "image/jpg"]:
                 resultado = analisar_imagem(arquivo, st.session_state.pergunta_ativa)
             elif arquivo.type == "message/rfc822" or arquivo.name.endswith(".eml"):
@@ -640,19 +715,21 @@ if analisar_btn and arquivos:
             else:
                 resultado = "❌ Formato de arquivo não suportado"
 
+            # Exibir resultado com estilo
             html_resultado, cor, nivel = aplicar_estilo_pericial(resultado)
             st.markdown(html_resultado, unsafe_allow_html=True)
 
-            # RESUMO FINAL
-            resumo = extrair_resumo(resultado, nivel)
-            st.markdown(f"""
+            # RESUMO DO RESULTADO - COERENTE E COMPLETO
+            resumo = extrair_resumo(nivel)
+            st.markdown(f'''
             <div class="resumo-final">
-                <div class="veredito-destaque">📊 RESUMO DO RESULTADO</div>
-                <strong>Classificação:</strong> {nivel}<br>
+                <strong>📊 RESUMO DO RESULTADO</strong><br><br>
+                <strong>Classificação:</strong> {nivel}<br><br>
                 <strong>Conclusão:</strong> {resumo}
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
 
+            # Adicionar ao histórico
             st.session_state.historico_pericial.append({
                 "arquivo": arquivo.name,
                 "resultado": resultado,
