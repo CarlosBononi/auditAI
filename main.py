@@ -5,6 +5,7 @@ from fpdf import FPDF
 import io
 import email
 from email import policy
+from email.parser import BytesParser
 from datetime import datetime
 import pytz
 import re
@@ -162,7 +163,90 @@ def gerar_pdf_pericial(conteudo, data_f):
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 10. MOTOR PERICIAL COM PROTOCOLO ESPECIALIZADO POR TIPO
+# 10. FUNÇÃO PARA EXTRAIR CONTEÚDO COMPLETO DE E-MAIL EML
+def extrair_conteudo_eml(content_bytes):
+    """Extrai cabeçalhos completos e corpo de e-mail EML"""
+    try:
+        # Parsear o e-mail completo
+        msg = email.message_from_bytes(content_bytes, policy=policy.default)
+        
+        # Extrair cabeçalhos importantes
+        remetente = msg.get('From', 'Não disponível')
+        destinatario = msg.get('To', 'Não disponível')
+        assunto = msg.get('Subject', 'Sem assunto')
+        data_envio = msg.get('Date', 'Não disponível')
+        cc = msg.get('Cc', 'Não disponível')
+        
+        # Extrair cabeçalhos de autenticação
+        spf = msg.get('Received-SPF', 'Não disponível')
+        dkim = msg.get('DKIM-Signature', 'Não disponível')
+        dmarc = msg.get('DMARC-Status', 'Não disponível')
+        
+        # Extrair corpo do e-mail
+        corpo = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                content_disposition = str(part.get("Content-Disposition"))
+                
+                # Extrair texto
+                if content_type == "text/plain" and "attachment" not in content_disposition:
+                    try:
+                        corpo = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        break
+                    except:
+                        pass
+        else:
+            # E-mail não multipart
+            try:
+                corpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+            except:
+                corpo = msg.get_payload()
+        
+        # Montar conteúdo completo para análise
+        conteudo_completo = f"""
+        E-MAIL COMPLETO - ANÁLISE FORENSE
+        
+        METADADOS:
+        Remetente: {remetente}
+        Destinatário: {destinatario}
+        Assunto: {assunto}
+        Data de Envio: {data_envio}
+        CC: {cc}
+        
+        REGISTROS DE SEGURANÇA:
+        SPF: {spf}
+        DKIM: {dkim}
+        DMARC: {dmarc}
+        
+        CORPO DA MENSAGEM:
+        {corpo}
+        """
+        
+        return conteudo_completo.strip()
+        
+    except Exception as e:
+        return f"E-MAIL (Erro na extração: {str(e)}): {content_bytes[:500]}..."
+
+# 11. FUNÇÃO PARA EXTRAIR CONTEÚDO DE PST (simplificado para esta versão)
+def extrair_conteudo_pst(content_bytes):
+    """Extrai conteúdo básico de arquivo PST"""
+    try:
+        # Para PST, retornamos informação básica
+        # Em versão completa, usaria biblioteca como pypff
+        return f"""
+        ARQUIVO PST - ANÁLISE FORENSE
+        
+        Tipo: Arquivo de dados do Outlook (.pst)
+        Tamanho: {len(content_bytes)} bytes
+        
+        Nota: Este arquivo contém e-mails, contatos e calendários.
+        Para análise completa, utilize ferramentas especializadas como pypff ou libpff.
+        """
+    except Exception as e:
+        return f"PST (Erro: {str(e)}): Arquivo de dados do Outlook"
+
+# 12. MOTOR PERICIAL COM ANÁLISE INDIVIDUAL E CRUZADA
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -177,20 +261,19 @@ with col1:
             
             with st.spinner("🕵️ AuditIA realizando auditoria técnica profunda..."):
                 try:
-                    # DETERMINAR O TIPO DE ARQUIVO PARA ANÁLISE ESPECIALIZADA
+                    # DETERMINAR OS TIPOS DE ARQUIVOS PARA ANÁLISE ESPECIALIZADA
                     tipos_arquivos = [f['type'] for f in st.session_state.arquivos_acumulados]
-                    nomes_arquivos = [f['name'] for f in st.session_state.arquivos_acumulados]
+                    nomes_arquivos = [f['name'].lower() for f in st.session_state.arquivos_acumulados]
                     
-                    # Identificar se há imagens, e-mails ou PDFs
                     tem_imagem = any(t.startswith('image') for t in tipos_arquivos)
-                    tem_email = any('.eml' in n.lower() or '.pst' in n.lower() for n in nomes_arquivos)
+                    tem_email = any('.eml' in n or '.pst' in n for n in nomes_arquivos)
                     tem_pdf = any(t == 'application/pdf' for t in tipos_arquivos)
                     
                     # INSTRUÇÃO COM PROTOCOLO ESPECIALIZADO
                     instrucao = f"""
                     Aja como o AuditIA, inteligência forense de elite para e-discovery. Hoje é {agora}.
                     
-                    📋 PROTOCOLO DE ANÁLISE ESPECIALIZADA:
+                    📋 PROTOCOLO DE ANÁLISE MULTIMODAL:
                     """
                     
                     if tem_imagem:
@@ -209,7 +292,7 @@ with col1:
                         instrucao += """
                     📧 ANÁLISE DE E-MAILS (Protocolo e-Discovery):
                     1. METADADOS: Verifique remetente, destinatário, servidores de e-mail, timestamps
-                    2. REGISTROS DE SEGURANÇA: Analise SPF, DKIM e DMARC
+                    2. REGISTROS DE SEGURANÇA: Analise SPF, DKIM e DMARC para autenticidade
                     3. CONTEÚDO: Identifique padrões de phishing, links maliciosos, linguagem manipulativa
                     4. ASSINATURAS: Verifique autenticidade das assinaturas digitais
                     5. CLASSIFICAÇÃO: Use "SEGURO", "ATENÇÃO", "POSSÍVEL FRAUDE" ou "FRAUDE CONFIRMADA"
@@ -226,11 +309,17 @@ with col1:
                     """
                     
                     instrucao += f"""
+                    🔄 ANÁLISE CRUZADA (Quando múltiplos arquivos):
+                    - Compare informações entre arquivos diferentes
+                    - Identifique contradições ou consistências
+                    - Relacione dados de diferentes fontes para conclusão forense
+                    
                     🎯 ESTRUTURA OBRIGATÓRIA:
                     - Inicie com 'PERGUNTA: "{pergunta_efetiva}"'
                     - Seguido de 'CLASSIFICAÇÃO: [TIPO]'
-                    - Em seguida, 'ANÁLISE DETALHADA (AuditIA Protocolo V16):'
-                    - Listar os pontos relevantes para o tipo de arquivo analisado
+                    - Em seguida, 'ANÁLISE DETALHADA:'
+                    - Listar os pontos relevantes para cada tipo de arquivo analisado
+                    - Conclusão final com veredito pericial
                     
                     🚨 REGRAS DE CLASSIFICAÇÃO FINAL:
                     - FRAUDE CONFIRMADA: Evidências claras de manipulação ou fraude
@@ -239,13 +328,13 @@ with col1:
                     - SEGURO: Nenhuma anomalia detectada
                     
                     🎯 NOSSOS 7 PILARES DE INVESTIGAÇÃO:
-                    - Análise Documental (metadados e fontes)
-                    - Detecção de IA (12 marcadores anatômicos)
-                    - e-Discovery (.eml e .pst)
-                    - Engenharia Social (phishing/spoofing)
-                    - Física da Luz (reflexos e sombras)
-                    - Ponzi Detection (promessas inconsistentes)
-                    - Consistência Digital (rastro vs conteúdo)
+                    1. Análise Documental (metadados e fontes)
+                    2. Detecção de IA (12 marcadores anatômicos)
+                    3. e-Discovery (.eml e .pst)
+                    4. Engenharia Social (phishing/spoofing)
+                    5. Física da Luz (reflexos e sombras)
+                    6. Ponzi Detection (promessas inconsistentes)
+                    7. Consistência Digital (rastro vs conteúdo)
                     """
                     
                     contexto = [instrucao]
@@ -254,15 +343,26 @@ with col1:
                     for h in st.session_state.historico_pericial:
                         contexto.append(h)
                     
-                    # Processar arquivos acumulados
+                    # Processar arquivos acumulados INDIVIDUALMENTE
                     for f in st.session_state.arquivos_acumulados:
-                        if f['name'].endswith('.eml'):
-                            msg = email.message_from_bytes(f['content'], policy=policy.default)
-                            corpo = msg.get_body(preferencelist=('plain')).get_content()
-                            contexto.append(f"E-MAIL {f['name']}: {corpo}")
+                        nome_arq = f['name'].lower()
+                        
+                        if nome_arq.endswith('.eml'):
+                            # Extrair conteúdo completo do EML
+                            conteudo_eml = extrair_conteudo_eml(f['content'])
+                            contexto.append(f"ARQUIVO E-MAIL ({f['name']}):\n{conteudo_eml}")
+                        
+                        elif nome_arq.endswith('.pst'):
+                            # Extrair conteúdo básico do PST
+                            conteudo_pst = extrair_conteudo_pst(f['content'])
+                            contexto.append(f"ARQUIVO PST ({f['name']}):\n{conteudo_pst}")
+                        
                         elif f['type'] == "application/pdf":
+                            # Enviar PDF para análise
                             contexto.append({"mime_type": "application/pdf", "data": f['content']})
+                        
                         else:
+                            # Imagens
                             contexto.append(Image.open(io.BytesIO(f['content'])).convert('RGB'))
                     
                     # Adicionar pergunta do usuário
@@ -322,7 +422,7 @@ with col2:
         st.session_state.arquivos_acumulados = []
         st.rerun()
 
-# 11. DOWNLOAD DE LAUDO PDF
+# 13. DOWNLOAD DE LAUDO PDF
 if st.session_state.historico_pericial:
     st.markdown("---")
     tz_br = pytz.timezone('America/Sao_Paulo')
@@ -337,7 +437,7 @@ if st.session_state.historico_pericial:
         mime="application/pdf"
     )
 
-# 12. GUIA MESTRE AUDITIA
+# 14. GUIA MESTRE AUDITIA
 st.markdown("---")
 with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite"):
     tab1, tab2, tab3 = st.tabs(["🎯 Nossos 7 Pilares", "🛠️ Como Usar", "❓ FAQ"])
@@ -383,7 +483,10 @@ with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite
         R: Executamos o Protocolo V16, analisando mãos, dentes, reflexos oculares em busca de "perfeição plástica" característica da IA.
         
         **Q: Como funciona a análise de e-mails?**
-        R: Verificamos metadados, registros SPF/DKIM/DMARC, padrões de phishing e assinaturas digitais.
+        R: Verificamos metadados (remetente, destinatário, data), registros SPF/DKIM/DMARC, padrões de phishing e assinaturas digitais.
+        
+        **Q: O que é análise cruzada?**
+        R: Quando você carrega múltiplos arquivos, o sistema compara informações entre eles para identificar contradições ou consistências.
         
         **Q: Qual o tamanho máximo dos arquivos?**
         R: Até 200MB individuais, totalizando 1GB por sessão pericial.
