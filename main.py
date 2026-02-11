@@ -23,7 +23,7 @@ def processar_pericia():
 
 st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
 
-# 2. SEMÁFORO DE CORES COM PROTOCOLO V16 (UNIFICADO)
+# 2. SEMÁFORO DE CORES COM PROTOCOLO ESPECIALIZADO
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     
@@ -32,7 +32,7 @@ def aplicar_estilo_pericial(texto):
         cor, font = "#ff4b4b", "white"  # 🔴 VERMELHO
     elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING", "POSSÍVEL FRAUDE"]):
         cor, font = "#ffa500", "white"  # 🟠 LARANJA
-    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO", "ALTA PROBABILIDADE DE IA"]):
+    elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: ATENÇÃO", "IMAGEM", "FOTO", "IA", "SINTÉTICO", "ALTA PROBABILIDADE DE IA", "ANÁLISE DE E-MAIL"]):
         cor, font = "#f1c40f", "black"  # 🟡 AMARELO (Protocolo de Dúvida)
     elif any(term in texto_upper for term in ["CLASSIFICAÇÃO: SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO", "AUTENTICIDADE CONFIRMADA"]):
         cor, font = "#2ecc71", "white"  # 🟢 VERDE
@@ -162,7 +162,7 @@ def gerar_pdf_pericial(conteudo, data_f):
     pdf.multi_cell(0, 8, txt=texto_limpo)
     return pdf.output(dest='S').encode('latin-1')
 
-# 10. MOTOR PERICIAL COM PROTOCOLO V16 CORRIGIDO
+# 10. MOTOR PERICIAL COM PROTOCOLO ESPECIALIZADO POR TIPO
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -177,27 +177,68 @@ with col1:
             
             with st.spinner("🕵️ AuditIA realizando auditoria técnica profunda..."):
                 try:
-                    # INSTRUÇÃO COM PROTOCOLO V16 MANDATÓRIO - CORRIGIDO
+                    # DETERMINAR O TIPO DE ARQUIVO PARA ANÁLISE ESPECIALIZADA
+                    tipos_arquivos = [f['type'] for f in st.session_state.arquivos_acumulados]
+                    nomes_arquivos = [f['name'] for f in st.session_state.arquivos_acumulados]
+                    
+                    # Identificar se há imagens, e-mails ou PDFs
+                    tem_imagem = any(t.startswith('image') for t in tipos_arquivos)
+                    tem_email = any('.eml' in n.lower() or '.pst' in n.lower() for n in nomes_arquivos)
+                    tem_pdf = any(t == 'application/pdf' for t in tipos_arquivos)
+                    
+                    # INSTRUÇÃO COM PROTOCOLO ESPECIALIZADO
                     instrucao = f"""
                     Aja como o AuditIA, inteligência forense de elite para e-discovery. Hoje é {agora}.
                     
-                    📋 PROTOCOLO V16 - ANÁLISE OBRIGATÓRIA:
+                    📋 PROTOCOLO DE ANÁLISE ESPECIALIZADA:
+                    """
+                    
+                    if tem_imagem:
+                        instrucao += """
+                    🖼️ ANÁLISE DE IMAGENS (Protocolo V16):
                     1. IMAGENS DE PESSOAS: Analise com CETICISMO MÁXIMO - QUALQUER ANOMALIA ANATÔMICA INDICA FRAUDE
                     2. ANATOMIA: Verifique fusão de dedos, articulações, dentes e simetria facial - QUALQUER INCONSISTÊNCIA = FRAUDE
                     3. FÍSICA DA LUZ: Observe reflexos oculares e sombras (devem ter fonte única) - INCONSISTÊNCIA = FRAUDE
                     4. TEXTURA DE PELE: Identifique "perfeição plástica" ou ausência de poros/ruído digital - PRESENÇA = FRAUDE
                     5. METADADOS: Se não houver EXIF ou rastro de sensor, classifique como "ATENÇÃO (ALTA PROBABILIDADE DE IA)"
-                    6. ESTRUTURA: Inicie com 'PERGUNTA: "{pergunta_efetiva}"' seguido de 'CLASSIFICAÇÃO: [TIPO]'
+                    6. NUNCA classifique como "IMAGENS REAIS" quando houver qualquer indício de IA
+                    7. Se detectar QUALQUER característica típica de IA, classifique como "FRAUDE CONFIRMADA"
+                    """
                     
-                    🚨 REGRAS DE CLASSIFICAÇÃO OBRIGATÓRIAS:
-                    - Se houver QUALQUER anomalia anatômica (dedos, dentes, olhos), classifique como "FRAUDE CONFIRMADA"
-                    - Se houver "perfeição plástica" na pele ou ausência de poros, classifique como "FRAUDE CONFIRMADA"
-                    - Se houver inconsistências na física da luz, classifique como "FRAUDE CONFIRMADA"
-                    - Se não houver metadados EXIF, classifique como "ATENÇÃO (ALTA PROBABILIDADE DE IA)"
-                    - NUNCA classifique como "IMAGENS REAIS" quando houver qualquer indício de IA
-                    - Se detectar QUALQUER característica típica de IA, classifique como "FRAUDE CONFIRMADA"
+                    if tem_email:
+                        instrucao += """
+                    📧 ANÁLISE DE E-MAILS (Protocolo e-Discovery):
+                    1. METADADOS: Verifique remetente, destinatário, servidores de e-mail, timestamps
+                    2. REGISTROS DE SEGURANÇA: Analise SPF, DKIM e DMARC
+                    3. CONTEÚDO: Identifique padrões de phishing, links maliciosos, linguagem manipulativa
+                    4. ASSINATURAS: Verifique autenticidade das assinaturas digitais
+                    5. CLASSIFICAÇÃO: Use "SEGURO", "ATENÇÃO", "POSSÍVEL FRAUDE" ou "FRAUDE CONFIRMADA"
+                    6. NÃO MENCIONE ANALOGIAS DE IMAGENS (anatomia, física da luz, textura de pele)
+                    """
                     
-                    🎯 NOSSOS 7 PILARES:
+                    if tem_pdf:
+                        instrucao += """
+                    📄 ANÁLISE DE PDFS (Protocolo Documental):
+                    1. METADADOS: Verifique autor, data de criação, software usado
+                    2. CONTEÚDO: Analise links, formulários e possíveis scripts maliciosos
+                    3. ASSINATURAS: Verifique autenticidade das assinaturas digitais
+                    4. CONSISTÊNCIA: Compare o conteúdo com o rastro digital deixado
+                    """
+                    
+                    instrucao += f"""
+                    🎯 ESTRUTURA OBRIGATÓRIA:
+                    - Inicie com 'PERGUNTA: "{pergunta_efetiva}"'
+                    - Seguido de 'CLASSIFICAÇÃO: [TIPO]'
+                    - Em seguida, 'ANÁLISE DETALHADA (AuditIA Protocolo V16):'
+                    - Listar os pontos relevantes para o tipo de arquivo analisado
+                    
+                    🚨 REGRAS DE CLASSIFICAÇÃO FINAL:
+                    - FRAUDE CONFIRMADA: Evidências claras de manipulação ou fraude
+                    - POSSÍVEL FRAUDE: Indícios fortes mas não conclusivos
+                    - ATENÇÃO: Inconsistências detectadas, requer investigação adicional
+                    - SEGURO: Nenhuma anomalia detectada
+                    
+                    🎯 NOSSOS 7 PILARES DE INVESTIGAÇÃO:
                     - Análise Documental (metadados e fontes)
                     - Detecção de IA (12 marcadores anatômicos)
                     - e-Discovery (.eml e .pst)
@@ -230,22 +271,34 @@ with col1:
                     # Gerar resposta
                     response = model.generate_content(contexto, request_options={"timeout": 600})
                     
-                    # CORREÇÃO PÓS-PROCESSAMENTO - EVITA CLASSIFICAÇÕES ERRADAS
+                    # CORREÇÃO PÓS-PROCESSAMENTO
                     resposta_texto = response.text
                     
-                    # Detectar se há imagens de pessoas (pelo contexto ou resposta)
-                    tem_imagens_pessoas = any(f['type'].startswith('image') for f in st.session_state.arquivos_acumulados)
+                    # Forçar classificação correta para e-mails (remover menções a análise de imagens)
+                    if tem_email and not tem_imagem:
+                        # Remover padrões de análise de imagens em resposta de e-mail
+                        resposta_texto = re.sub(r"1\. IMAGENS DE PESSOAS:.*?(?=\n2\.|\n3\.|\n4\.|\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
+                        resposta_texto = re.sub(r"2\. ANATOMIA:.*?(?=\n3\.|\n4\.|\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
+                        resposta_texto = re.sub(r"3\. FÍSICA DA LUZ:.*?(?=\n4\.|\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
+                        resposta_texto = re.sub(r"4\. TEXTURA DE PELE:.*?(?=\n5\.|\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
+                        resposta_texto = re.sub(r"5\. METADADOS:.*?(?=\n6\.|$)", "", resposta_texto, flags=re.DOTALL | re.MULTILINE)
+                        
+                        # Forçar classificação adequada para e-mails
+                        if "CLASSIFICAÇÃO: SEGURO" not in resposta_texto.upper():
+                            resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: ATENÇÃO", "CLASSIFICAÇÃO: ATENÇÃO (ANÁLISE DE E-MAIL)")
+                            resposta_texto = resposta_texto.replace("ATENÇÃO (ALTA PROBABILIDADE DE IA)", "ATENÇÃO (ANÁLISE DE E-MAIL)")
                     
-                    # Se houver imagens de pessoas e o modelo classificou como "reais", corrigir automaticamente
-                    if tem_imagens_pessoas:
-                        if re.search(r'PROVAVELMENTE\s+IMAGENS\s+REAIS|IMAGENS\s+REAIS|CLASSIFICAÇÃO:\s*SEGURO', resposta_texto.upper()):
+                    # Forçar classificação correta para imagens (evitar "imagens reais")
+                    if tem_imagem:
+                        if re.search(r'PROVAVELMENTE\s+IMAGENS?\s+REAIS|IMAGENS?\s+REAIS|CLASSIFICAÇÃO:\s*SEGURO', resposta_texto.upper()):
                             # Forçar classificação correta para imagens com anomalias
                             resposta_texto = resposta_texto.replace("PROVAVELMENTE IMAGENS REAIS", "FRAUDE CONFIRMADA")
                             resposta_texto = resposta_texto.replace("IMAGENS REAIS", "FRAUDE CONFIRMADA")
                             resposta_texto = resposta_texto.replace("CLASSIFICAÇÃO: SEGURO", "CLASSIFICAÇÃO: FRAUDE CONFIRMADA")
                             
                             # Adicionar nota de correção
-                            resposta_texto += "\n\n⚠️ **CORREÇÃO AUTOMÁTICA DO PROTOCOLO V16**: O sistema detectou que a classificação original contraria os protocolos forenses. De acordo com o Protocolo V16, imagens com anomalias anatômicas, perfeição plástica ou ausência de metadados EXIF devem ser classificadas como FRAUDE CONFIRMADA."
+                            if "CORREÇÃO AUTOMÁTICA" not in resposta_texto:
+                                resposta_texto += "\n\n⚠️ **CORREÇÃO AUTOMÁTICA DO PROTOCOLO V16**: O sistema detectou que a classificação original contraria os protocolos forenses. De acordo com o Protocolo V16, imagens com anomalias anatômicas, perfeição plástica ou ausência de metadados EXIF devem ser classificadas como FRAUDE CONFIRMADA."
                         
                         # Verificar se há "perfeição plástica" ou anomalias na resposta
                         elif "perfeição plástica" in resposta_texto.lower() or "anomalia" in resposta_texto.lower() or "inconsistência" in resposta_texto.lower():
@@ -311,6 +364,7 @@ with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite
         **Pergunta ao Perito**: Seja cirúrgico!
         - ❌ "Isso é real?" → Genérico
         - ✅ "Analise a textura de pele e sombras desta face" → Específico
+        - ✅ "Verifique os registros SPF/DKIM deste e-mail" → Específico
         
         **Interpretando o Termômetro**:
         - 🟢 **Verde**: Autenticidade confirmada com rastro EXIF/físico
@@ -327,6 +381,9 @@ with st.expander("🎓 GUIA MESTRE AUDITIA - Manual de Perícia Digital de Elite
         
         **Q: Como funciona a análise de fotos de pessoas?**
         R: Executamos o Protocolo V16, analisando mãos, dentes, reflexos oculares em busca de "perfeição plástica" característica da IA.
+        
+        **Q: Como funciona a análise de e-mails?**
+        R: Verificamos metadados, registros SPF/DKIM/DMARC, padrões de phishing e assinaturas digitais.
         
         **Q: Qual o tamanho máximo dos arquivos?**
         R: Até 200MB individuais, totalizando 1GB por sessão pericial.
