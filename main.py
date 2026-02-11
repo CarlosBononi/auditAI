@@ -11,7 +11,6 @@ import pytz
 import re
 import os
 
-# ==================== CONFIGURAÇÃO INICIAL ====================
 st.set_page_config(
     page_title="AuditIA - Inteligência Forense Digital",
     page_icon="👁️",
@@ -19,7 +18,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Configurar API do Gemini
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -28,257 +26,234 @@ except Exception as e:
     st.error(f"⚠️ Erro ao configurar API do Gemini: {str(e)}")
     st.stop()
 
-# ==================== ESTILO CUSTOMIZADO ====================
+# CSS com tema dark tecnológico
 st.markdown("""
 <style>
     :root {
         --verde-logo: #8BC34A;
-        --cinza-fundo: #121212;
-        --cinza-claro: #2c2c2c;
-        --cinza-medio: #9e9e9e;
+        --cinza-fundo: #1a1a1a;
+        --cinza-medio: #2d2d2d;
     }
 
-    body {
+    .stApp {
         background-color: var(--cinza-fundo);
-        color: #f5f5f5;
+        color: #e0e0e0;
     }
 
-    .main {
-        background-color: var(--cinza-fundo);
-    }
-
-    /* Sidebar com cinza escuro e texto verde */
+    /* Sidebar dark com texto verde */
     [data-testid="stSidebar"] {
-        background-color: #1d1d1d;
+        background-color: #1a1a1a;
     }
 
-    [data-testid="stSidebar"] * {
+    [data-testid="stSidebar"] .element-container {
         color: var(--verde-logo) !important;
     }
 
-    /* Botões cinza claro */
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] div {
+        color: var(--verde-logo) !important;
+    }
+
+    /* Botões cinza */
     .stButton > button {
-        width: 100%;
+        background-color: #424242;
+        color: #e0e0e0;
+        border: none;
         padding: 0.5rem 1rem;
         border-radius: 8px;
-        font-weight: 500;
         transition: all 0.3s;
-        margin: 0.25rem 0;
-        background-color: #424242;
-        color: #f5f5f5;
-        border: 2px solid #616161;
     }
 
     .stButton > button:hover {
         background-color: #616161;
-        border-color: #9e9e9e;
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
 
-    /* Botão Analisar levemente destacado */
+    /* Botão Analisar verde */
     div[data-testid="column"]:first-child .stButton > button {
-        background-color: #76ff03;
+        background-color: var(--verde-logo);
         color: #000000;
-        border-color: #76ff03;
+        font-weight: 600;
     }
 
-    /* Inputs e caixas de texto com fundo cinza escuro e borda verde */
+    div[data-testid="column"]:first-child .stButton > button:hover {
+        background-color: #9CCC65;
+    }
+
+    /* Inputs com fundo cinza e borda verde */
     .stTextArea textarea,
     .stTextInput input {
-        background-color: #1e1e1e !important;
-        color: #f5f5f5 !important;
+        background-color: var(--cinza-medio) !important;
+        color: #e0e0e0 !important;
         border: 1px solid var(--verde-logo) !important;
     }
 
+    /* File uploader */
     [data-testid="stFileUploader"] {
-        background-color: #1e1e1e;
+        background-color: var(--cinza-medio);
+        border: 1px solid var(--verde-logo);
         border-radius: 8px;
         padding: 1rem;
-        border: 1px solid var(--verde-logo);
     }
 
-    /* Termo de consentimento agora cinza escuro com texto verde, no rodapé */
-    .termo-consentimento {
-        background-color: #1e1e1e;
-        border-left: 4px solid var(--verde-logo);
-        padding: 1.2rem;
-        border-radius: 8px;
-        margin: 1rem 0;
+    [data-testid="stFileUploader"] label {
+        color: #e0e0e0 !important;
+    }
+
+    /* Título Upload igual ao Analisando */
+    h1 {
+        font-size: 1.1rem !important;
+        font-weight: 500 !important;
         color: #e0e0e0;
     }
 
+    /* Subtítulo */
     .subtitle-custom {
         font-size: 0.9rem;
         color: var(--verde-logo);
         font-weight: 400;
-        margin-top: -0.3rem;
-        margin-bottom: 1.2rem;
+        margin-top: -0.5rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
     }
 
-    /* Diminuir título Upload ao tamanho do 'Analisando' */
-    h1 {
-        font-size: 1.2rem !important;
-        font-weight: 600 !important;
+    /* VEREDITO e CLASSIFICAÇÃO maiores e em negrito */
+    .resultado-box h2 {
+        font-size: 1.5rem !important;
+        font-weight: 800 !important;
     }
 
-    /* Veredito em destaque */
-    .veredito-titulo {
-        font-size: 1.4rem;
-        font-weight: 800;
-    }
-
-    .classificacao-titulo {
-        font-size: 1.2rem;
-        font-weight: 800;
+    .resultado-box h3 {
+        font-size: 1.3rem !important;
+        font-weight: 800 !important;
     }
 
     /* Resumo final */
     .resumo-final {
-        background-color: #1e1e1e;
+        background-color: var(--cinza-medio);
         border-left: 4px solid var(--verde-logo);
-        padding: 1rem 1.2rem;
+        padding: 1.2rem;
         border-radius: 8px;
-        margin: 1.2rem 0;
-        font-size: 0.95rem;
+        margin: 1.5rem 0;
         color: #e0e0e0;
     }
 
     .resumo-final strong {
         color: var(--verde-logo);
+        font-size: 1.1rem;
     }
 
-    /* Dica em cinza claro */
+    /* Info box (dica) em cinza claro */
     .stAlert {
-        background-color: #2c2c2c !important;
+        background-color: var(--cinza-medio) !important;
         color: #e0e0e0 !important;
+        border-left: 4px solid #757575 !important;
+    }
+
+    /* Termo no final */
+    .termo-consentimento {
+        background-color: var(--cinza-medio);
+        border-left: 4px solid var(--verde-logo);
+        padding: 1.2rem;
+        border-radius: 8px;
+        margin-top: 2rem;
+        color: #e0e0e0;
+    }
+
+    .termo-consentimento h4 {
+        color: var(--verde-logo);
+    }
+
+    /* Imagens */
+    .stImage img {
+        max-width: 300px !important;
+        max-height: 300px !important;
         border-radius: 8px;
     }
-
-    .stAlert * {
-        color: #e0e0e0 !important;
-    }
-
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== GESTÃO DE SESSÃO ====================
+# Estado da sessão
 if "historico_pericial" not in st.session_state:
     st.session_state.historico_pericial = []
-if "arquivos_acumulados" not in st.session_state:
-    st.session_state.arquivos_acumulados = []
 if "pergunta_ativa" not in st.session_state:
     st.session_state.pergunta_ativa = ""
 if "termo_aceito" not in st.session_state:
     st.session_state.termo_aceito = False
-if "caso_id" not in st.session_state:
-    st.session_state.caso_id = None
 
 def iniciar_novo_caso():
     st.session_state.historico_pericial = []
-    st.session_state.arquivos_acumulados = []
     st.session_state.pergunta_ativa = ""
-    st.session_state.caso_id = datetime.now().strftime("%Y%m%d%H%M%S")
     st.rerun()
 
 def processar_pericia():
-    st.session_state.pergunta_ativa = st.session_state.campo_pergunta
-    st.session_state.campo_pergunta = ""
-
-# ==================== SISTEMA DE CORES ====================
+    st.session_state.pergunta_ativa = st.session_state.get("campo_pergunta", "")
 
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
 
-    if any(term in texto_upper for term in [
-        "CLASSIFICAÇÃO: FRAUDE CONFIRMADA", "VEREDITO: FRAUDE CONFIRMADA",
-        "GOLPE CONFIRMADO", "SCAM CONFIRMADO"]):
-        cor, font = "#d32f2f", "white"
-        nivel = "FRAUDE CONFIRMADA"
-    elif any(term in texto_upper for term in [
-        "CLASSIFICAÇÃO: POSSÍVEL FRAUDE", "VEREDITO: POSSÍVEL FRAUDE",
-        "POSSÍVEL FRAUDE", "ALTA ATENÇÃO", "PHISHING"]):
-        cor, font = "#f57c00", "white"
-        nivel = "POSSÍVEL FRAUDE"
-    elif any(term in texto_upper for term in [
-        "CLASSIFICAÇÃO: ATENÇÃO", "VEREDITO: ATENÇÃO",
-        "ATENÇÃO", "INCONSISTÊNCIAS"]):
-        cor, font = "#fbc02d", "black"
-        nivel = "ATENÇÃO"
-    elif any(term in texto_upper for term in [
-        "CLASSIFICAÇÃO: SEGURO", "VEREDITO: SEGURO",
-        "SEGURO", "INTEGRIDADE CONFIRMADA", "LEGÍTIMO"]):
-        cor, font = "#388e3c", "white"
-        nivel = "SEGURO"
+    # Detecção de nível com prioridade
+    if "CLASSIFICAÇÃO: SEGURO" in texto_upper or "VEREDITO: SEGURO" in texto_upper:
+        cor, font, nivel = "#388e3c", "white", "SEGURO"
+    elif "CLASSIFICAÇÃO: FRAUDE CONFIRMADA" in texto_upper or "GOLPE CONFIRMADO" in texto_upper:
+        cor, font, nivel = "#d32f2f", "white", "FRAUDE CONFIRMADA"
+    elif "CLASSIFICAÇÃO: POSSÍVEL FRAUDE" in texto_upper or "PHISHING" in texto_upper:
+        cor, font, nivel = "#f57c00", "white", "POSSÍVEL FRAUDE"
+    elif "CLASSIFICAÇÃO: ATENÇÃO" in texto_upper:
+        cor, font, nivel = "#fbc02d", "black", "ATENÇÃO"
     else:
-        cor, font = "#1976d2", "white"
-        nivel = "INFORMATIVO"
+        cor, font, nivel = "#1976d2", "white", "INFORMATIVO"
 
-    # Negrito adicional para veredito e classificação
-    texto_html = texto.replace("## 🎯 VEREDITO FINAL", "<span class='veredito-titulo'>🎯 VEREDITO FINAL</span>")
-    texto_html = re.sub(r"\*\*CLASSIFICAÇÃO:(.*?)\*\*",
-                        r"<span class='classificacao-titulo'><strong>CLASSIFICAÇÃO:</strong></span>",
-                        texto_html)
+    # Formatar com negrito
+    texto_formatado = texto.replace("## 🎯 VEREDITO FINAL", "<h2>🎯 VEREDITO FINAL</h2>")
+    texto_formatado = texto_formatado.replace("**CLASSIFICAÇÃO:", "<h3><strong>CLASSIFICAÇÃO:")
+    texto_formatado = texto_formatado.replace("**", "</strong></h3>", 1)
 
     return f"""
-    <div style="background-color: {cor}; color: {font}; padding: 1.5rem; 
-                border-radius: 12px; margin: 1rem 0; 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-        {texto_html.replace(chr(10), '<br>')}
+    <div class="resultado-box" style="background-color: {cor}; color: {font}; padding: 1.5rem; 
+                border-radius: 12px; margin: 1rem 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        {texto_formatado.replace(chr(10), '<br>')}
     </div>
     """, cor, nivel
 
-
-def extrair_resumo(texto, nivel):
-    # Resumo coerente com a classificação; não inferimos do texto para evitar conflito
-    if nivel == "SEGURO":
-        return "Este conteúdo foi avaliado como legítimo, com forte indicação de autenticidade e ausência de sinais relevantes de fraude ou phishing."
-    if nivel == "FRAUDE CONFIRMADA":
-        return "Foram identificados múltiplos sinais objetivos de fraude, configurando golpe confirmado. Recomenda-se não prosseguir e adotar medidas de segurança imediatas."
-    if nivel == "POSSÍVEL FRAUDE":
-        return "Existem vários elementos suspeitos que indicam possível fraude. É recomendável tratar esta comunicação com extrema cautela e buscar validação independente."
-    if nivel == "ATENÇÃO":
-        return "Foram observados alguns pontos de atenção que exigem verificação adicional antes de confiar totalmente neste conteúdo."
-    return "Análise informativa concluída. Não foram identificados elementos suficientes para classificar como fraude ou como totalmente seguro."
-
-# ==================== PROMPTS ====================
+def extrair_resumo(nivel):
+    resumos = {
+        "SEGURO": "Este conteúdo foi avaliado como legítimo, com forte indicação de autenticidade e ausência de sinais relevantes de fraude ou phishing.",
+        "FRAUDE CONFIRMADA": "Foram identificados múltiplos sinais objetivos de fraude, configurando golpe confirmado. Não prossiga e adote medidas de segurança imediatas.",
+        "POSSÍVEL FRAUDE": "Existem vários elementos suspeitos que indicam possível fraude. Trate esta comunicação com extrema cautela e busque validação independente.",
+        "ATENÇÃO": "Foram observados alguns pontos de atenção que exigem verificação adicional antes de confiar totalmente neste conteúdo.",
+        "INFORMATIVO": "Análise informativa concluída. Não foram identificados elementos suficientes para classificar como fraude ou como totalmente seguro."
+    }
+    return resumos.get(nivel, "Análise concluída.")
 
 def obter_prompt_analise(tipo_arquivo):
     prompt_base = """
-    Você é um especialista em análise forense digital. Sua análise deve ser clara, objetiva e conclusiva.
+Você é um especialista em análise forense digital. Sua análise deve ser clara, objetiva e conclusiva.
 
-    ESTRUTURA OBRIGATÓRIA DA RESPOSTA:
+ESTRUTURA OBRIGATÓRIA DA RESPOSTA:
 
-    ## 🎯 VEREDITO FINAL
-    **CLASSIFICAÇÃO: [FRAUDE CONFIRMADA / POSSÍVEL FRAUDE / ATENÇÃO / SEGURO]**
+## 🎯 VEREDITO FINAL
+**CLASSIFICAÇÃO: [FRAUDE CONFIRMADA / POSSÍVEL FRAUDE / ATENÇÃO / SEGURO]**
 
-    [Explique em 2-3 linhas a conclusão de forma direta]
+[Explique em 2-3 linhas a conclusão]
 
-    ## 📋 ANÁLISE TÉCNICA
-    [Explique os principais pontos técnicos que sustentam o veredito]
+## 📋 ANÁLISE TÉCNICA
+[Principais pontos técnicos]
 
-    ## ⚠️ RECOMENDAÇÕES
-    [Liste ações práticas para o usuário]
-    """
+## ⚠️ RECOMENDAÇÕES
+[Ações práticas]
+"""
 
     if tipo_arquivo == "image":
-        return prompt_base + """
-
-        Foque em detecção de deepfake, manipulações digitais e incoerências visuais.
-        """
-    if tipo_arquivo == "email":
-        return prompt_base + """
-
-        Foque em linguagem de phishing, autenticidade de domínio, links, cabeçalhos SPF/DKIM e coerência do contexto com remetente legítimo.
-        """
-    if tipo_arquivo == "pdf":
-        return prompt_base + """
-
-        Foque em autenticidade de documento, metadados, fontes, assinaturas e possíveis montagens.
-        """
+        return prompt_base + "\nFoque em deepfake, manipulações digitais e incoerências visuais."
+    elif tipo_arquivo == "email":
+        return prompt_base + "\nFoque em phishing, autenticidade de domínio, links suspeitos e cabeçalhos de autenticação."
+    elif tipo_arquivo == "pdf":
+        return prompt_base + "\nFoque em autenticidade de documento, metadados e possíveis montagens."
     return prompt_base
-
-# ==================== FUNÇÕES DE ANÁLISE ====================
 
 def analisar_imagem(image, pergunta_usuario=""):
     try:
@@ -287,22 +262,17 @@ def analisar_imagem(image, pergunta_usuario=""):
         model = genai.GenerativeModel(MODELO_USAR)
         prompt = obter_prompt_analise("image")
         if pergunta_usuario:
-            prompt += f"
-
-PERGUNTA DO USUÁRIO: {pergunta_usuario}"
+            prompt += f"\n\nPERGUNTA: {pergunta_usuario}"
         resposta = model.generate_content([prompt, img])
         return resposta.text
     except Exception as e:
-        return f"❌ Erro na análise de imagem: {str(e)}"
-
+        return f"❌ Erro: {str(e)}"
 
 def analisar_email(arquivo_email, pergunta_usuario=""):
     try:
         msg = BytesParser(policy=policy.default).parsebytes(arquivo_email.getvalue())
-        remetente = msg.get("From", "Não identificado")
-        destinatario = msg.get("To", "Não identificado")
-        assunto = msg.get("Subject", "Sem assunto")
-        data = msg.get("Date", "Sem data")
+        remetente = msg.get("From", "?")
+        assunto = msg.get("Subject", "?")
 
         corpo = ""
         if msg.is_multipart():
@@ -313,106 +283,91 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
         else:
             corpo = msg.get_payload(decode=True).decode(errors="ignore")
 
-        spf = msg.get("Received-SPF", "Não disponível")
-        dkim = msg.get("DKIM-Signature", "Não disponível")
-
-        contexto = f"""DADOS DO E-MAIL
-Remetente: {remetente}
-Destinatário: {destinatario}
-Assunto: {assunto}
-Data: {data}
-
-CONTEÚDO DA MENSAGEM (trecho):
-{corpo[:2000]}
-
-AUTENTICAÇÃO TÉCNICA:
-SPF: {spf}
-DKIM: {'Presente' if 'não disponível' not in dkim.lower() else 'Ausente'}
-"""
+        contexto = f"Remetente: {remetente}\nAssunto: {assunto}\n\nConteúdo:\n{corpo[:2000]}"
 
         model = genai.GenerativeModel(MODELO_USAR)
-        prompt = obter_prompt_analise("email") + "
-
-" + contexto
+        prompt = obter_prompt_analise("email") + "\n\n" + contexto
         if pergunta_usuario:
-            prompt += f"
-
-PERGUNTA DO USUÁRIO: {pergunta_usuario}"
+            prompt += f"\n\nPERGUNTA: {pergunta_usuario}"
         resposta = model.generate_content(prompt)
         return resposta.text
     except Exception as e:
-        return f"❌ Erro na análise de e-mail: {str(e)}"
-
+        return f"❌ Erro: {str(e)}"
 
 def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
     try:
         model = genai.GenerativeModel(MODELO_USAR)
         prompt = obter_prompt_analise("pdf")
         if pergunta_usuario:
-            prompt += f"
-
-PERGUNTA DO USUÁRIO: {pergunta_usuario}"
+            prompt += f"\n\nPERGUNTA: {pergunta_usuario}"
         resposta = model.generate_content([prompt, arquivo_pdf.getvalue()])
         return resposta.text
     except Exception as e:
-        return f"❌ Erro na análise de PDF: {str(e)}"
+        return f"❌ Erro: {str(e)}"
 
-# ==================== INTERFACE PRINCIPAL ====================
+# ==================== INTERFACE ====================
 
-# Logo maior (dobrado em relação à anterior). Para remover sobras, o fundo do app é cinza igual ao fundo da logo.
+# Logo GRANDE (800px)
 try:
     if os.path.exists("Logo_AI_1.png"):
         logo = Image.open("Logo_AI_1.png")
-        st.image(logo, width=800)  # se a anterior era ~400, aqui dobramos
+        st.image(logo, width=800)
 except:
     pass
 
-# Subtítulo: apenas "Inteligência Forense Digital"
+# Subtítulo apenas "Inteligência Forense Digital"
 st.markdown('<p class="subtitle-custom">Inteligência Forense Digital</p>', unsafe_allow_html=True)
 
-# ==================== GUIA (SIDEBAR) ====================
+# Sidebar
 with st.sidebar:
     st.header("📚 Guia Completo de Uso")
-    st.expander("🎯 O que é o AuditIA?").markdown("O AuditIA é uma plataforma de Inteligência Forense Digital para análise de imagens, e-mails e documentos.")
-    st.expander("📤 Como Enviar Arquivos?").markdown("Envie JPG, PNG, PDF, EML ou PST para análise pericial automatizada.")
-    st.expander("🎨 Entenda as Cores").markdown("Verde = seguro, Laranja = possível fraude, Vermelho = fraude confirmada, Amarelo = atenção, Azul = informativo.")
-    st.expander("🔍 Tipos de Análise").markdown("Deepfake, phishing, autenticidade documental e mais.")
-    st.expander("⚡ Perguntas Frequentes").markdown("O AuditIA não substitui perícia oficial, é uma ferramenta de apoio.")
-    st.info("💡 Quanto mais contexto você fornecer, melhor será a análise!", icon="ℹ️")
+    with st.expander("🎯 O que é o AuditIA?"):
+        st.write("Plataforma de Inteligência Forense Digital para análise de imagens, e-mails e documentos.")
+    with st.expander("📤 Como Enviar Arquivos?"):
+        st.write("Envie JPG, PNG, PDF, EML ou PST para análise.")
+    with st.expander("🎨 Entenda as Cores"):
+        st.write("🟢 Verde = Seguro | 🟠 Laranja = Possível Fraude | 🔴 Vermelho = Fraude Confirmada")
+    with st.expander("🔍 Tipos de Análise"):
+        st.write("Deepfake, phishing, autenticidade documental.")
+    with st.expander("⚡ Perguntas Frequentes"):
+        st.write("O AuditIA é uma ferramenta de apoio, não substitui perícia oficial.")
+    st.info("💡 Quanto mais contexto, melhor a análise!")
 
-# ==================== ÁREA DE UPLOAD ====================
+# Upload
 st.header("📂 Upload de Arquivos para Análise")
 
 arquivos = st.file_uploader(
-    "Selecione os arquivos para análise forense",
+    "Selecione os arquivos",
     type=["jpg", "jpeg", "png", "pdf", "eml", "pst"],
-    accept_multiple_files=True,
+    accept_multiple_files=True
 )
 
 pergunta = st.text_area(
     "💬 Pergunta Específica (Opcional)",
-    placeholder="Ex: Este e-mail é legítimo? Esta imagem foi manipulada? Este documento é autêntico?",
-    key="campo_pergunta",
+    placeholder="Ex: Este e-mail é legítimo?",
+    key="campo_pergunta"
 )
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    analisar_btn = st.button("🔍 Analisar", use_container_width=True, on_click=processar_pericia)
+    if st.button("🔍 Analisar", use_container_width=True):
+        processar_pericia()
 with col2:
-    limpar_btn = st.button("🗑️ Limpar Caso", use_container_width=True, on_click=iniciar_novo_caso)
+    if st.button("🗑️ Limpar Caso", use_container_width=True):
+        iniciar_novo_caso()
 with col3:
-    exportar_btn = st.button("📥 Exportar PDF", use_container_width=True)
+    st.button("📥 Exportar PDF", use_container_width=True)
 
-# ==================== PROCESSAMENTO ====================
-if analisar_btn and arquivos:
-    with st.spinner("🔬 Realizando análise forense detalhada..."):
+# Processamento
+if st.session_state.pergunta_ativa and arquivos:
+    with st.spinner("🔬 Analisando..."):
         for arquivo in arquivos:
             st.markdown(f"### 📄 Analisando: `{arquivo.name}`")
 
             if arquivo.type.startswith("image/"):
                 img = Image.open(arquivo)
                 img.thumbnail((300, 300))
-                st.image(img, caption=arquivo.name, width=300)
+                st.image(img, width=300)
 
             if arquivo.type in ["image/jpeg", "image/png", "image/jpg"]:
                 resultado = analisar_imagem(arquivo, st.session_state.pergunta_ativa)
@@ -421,15 +376,15 @@ if analisar_btn and arquivos:
             elif arquivo.type == "application/pdf":
                 resultado = analisar_pdf(arquivo, st.session_state.pergunta_ativa)
             else:
-                resultado = "❌ Formato de arquivo não suportado"
+                resultado = "❌ Formato não suportado"
 
             html_resultado, cor, nivel = aplicar_estilo_pericial(resultado)
             st.markdown(html_resultado, unsafe_allow_html=True)
 
-            resumo = extrair_resumo(resultado, nivel)
+            resumo = extrair_resumo(nivel)
             st.markdown(f"""
             <div class="resumo-final">
-                <strong>📊 RESUMO DO RESULTADO</strong><br>
+                <strong>📊 RESUMO DO RESULTADO</strong><br><br>
                 <strong>Classificação:</strong> {nivel}<br>
                 <strong>Conclusão:</strong> {resumo}
             </div>
@@ -438,44 +393,35 @@ if analisar_btn and arquivos:
             st.session_state.historico_pericial.append({
                 "arquivo": arquivo.name,
                 "resultado": resultado,
-                "cor": cor,
                 "nivel": nivel,
                 "timestamp": datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
             })
 
-elif analisar_btn and not arquivos:
-    st.warning("⚠️ Por favor, envie pelo menos um arquivo para análise.")
+    st.session_state.pergunta_ativa = ""
 
-# ==================== HISTÓRICO ====================
+# Histórico
 if st.session_state.historico_pericial:
     st.markdown("---")
-    st.header("📊 Histórico de Análises do Caso Atual")
+    st.header("📊 Histórico de Análises")
     for i, item in enumerate(st.session_state.historico_pericial, 1):
-        with st.expander(f"🔎 Análise #{i} - {item['arquivo']} | {item['timestamp']} | {item['nivel']}"):
+        with st.expander(f"🔎 #{i} - {item['arquivo']} | {item['timestamp']} | {item['nivel']}"):
             html_hist, _, _ = aplicar_estilo_pericial(item['resultado'])
             st.markdown(html_hist, unsafe_allow_html=True)
 
-# ==================== TERMO DE CONSENTIMENTO NO FINAL ====================
-
-with st.expander("⚖️ Termo de Consentimento e Uso Responsável", expanded=not st.session_state.termo_aceito):
+# Termo no final
+st.markdown("---")
+with st.expander("⚖️ Termo de Consentimento e Uso Responsável"):
     st.markdown("""
     <div class="termo-consentimento">
     <h4>Uso Responsável do AuditIA</h4>
-    <p>O AuditIA é uma ferramenta de apoio à análise forense digital. Os resultados são probabilísticos e não substituem perícia oficial ou julgamento humano especializado.</p>
+    <p>O AuditIA é uma ferramenta de apoio à análise forense digital. Os resultados são probabilísticos 
+    e não substituem perícia oficial.</p>
     <ul>
-        <li>Use os laudos como apoio, não como única prova.</li>
-        <li>Evite enviar dados excessivamente sensíveis.</li>
-        <li>Respeite a legislação e a privacidade de terceiros.</li>
+        <li>Use como apoio, não como única prova</li>
+        <li>Evite dados excessivamente sensíveis</li>
+        <li>Respeite legislação e privacidade</li>
     </ul>
     </div>
     """, unsafe_allow_html=True)
-    aceite = st.checkbox("Li e concordo com o uso responsável do AuditIA.", value=st.session_state.termo_aceito)
-    if aceite and not st.session_state.termo_aceito:
-        st.session_state.termo_aceito = True
-        st.rerun()
 
-if not st.session_state.termo_aceito:
-    st.warning("⚠️ Para utilizar o AuditIA, leia e aceite o Termo de Consumo Responsável no final da página.")
-
-st.markdown("---")
 st.caption("AuditIA v2.0 | Ferramenta de apoio - Não substitui perícia oficial")
