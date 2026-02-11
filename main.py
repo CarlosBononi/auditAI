@@ -14,7 +14,7 @@ import time
 import hashlib
 
 st.set_page_config(
-    page_title="AuditIA - Inteligência Forense Digital",
+    page_title="AuditIA - Inteligencia Forense Digital",
     page_icon="👁️",
     layout="centered",
     initial_sidebar_state="expanded"
@@ -48,46 +48,43 @@ class RateLimiterUltra:
 
         st.session_state.rate_limiter_calls.append(now)
 
-        current_usage = len(st.session_state.rate_limiter_calls)
-        if current_usage > 80:
-            st.info(f"Uso API: {current_usage}/100")
-
 rate_limiter = RateLimiterUltra()
-
-def detectar_modelo_disponivel():
-    if "modelo_detectado" in st.session_state:
-        return st.session_state.modelo_detectado
-
-    modelos_tentar = [
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro',
-        'gemini-1.5-pro-latest',
-        'gemini-pro',
-        'gemini-pro-vision'
-    ]
-
-    for modelo in modelos_tentar:
-        try:
-            test_model = genai.GenerativeModel(modelo)
-            test_model.generate_content("test")
-            st.session_state.modelo_detectado = modelo
-            return modelo
-        except:
-            continue
-
-    st.session_state.modelo_detectado = 'gemini-1.5-flash-latest'
-    return 'gemini-1.5-flash-latest'
 
 def inicializar_api():
     try:
         if "api_configurada" not in st.session_state:
             genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
             st.session_state.api_configurada = True
+            return True
     except Exception as e:
         st.error(f"Erro ao configurar API: {str(e)}")
         return False
     return True
+
+def obter_modelo():
+    if "modelo_gemini" in st.session_state:
+        return st.session_state.modelo_gemini
+
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        st.session_state.modelo_gemini = model
+        st.session_state.modelo_nome = 'gemini-1.5-flash'
+        return model
+    except:
+        try:
+            modelos_disp = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            if modelos_disp:
+                nome_modelo = modelos_disp[0]
+                model = genai.GenerativeModel(nome_modelo)
+                st.session_state.modelo_gemini = model
+                st.session_state.modelo_nome = nome_modelo
+                return model
+            else:
+                st.error("Nenhum modelo disponivel")
+                return None
+        except Exception as e:
+            st.error(f"Erro ao obter modelo: {str(e)}")
+            return None
 
 def call_gemini_with_retry(func, max_retries=3):
     for tentativa in range(max_retries):
@@ -99,14 +96,14 @@ def call_gemini_with_retry(func, max_retries=3):
             if "RATE_LIMIT_EXCEEDED" in error_msg or "429" in error_msg or "quota" in error_msg.lower():
                 if tentativa < max_retries - 1:
                     wait_time = 120 * (tentativa + 1)
-                    st.error(f"LIMITE! Aguardando {wait_time}s... (Tentativa {tentativa + 1}/{max_retries})")
+                    st.error(f"LIMITE! Aguardando {wait_time}s...")
                     time.sleep(wait_time)
                     st.session_state.rate_limiter_calls = []
                 else:
                     st.error("Quota excedida. AGUARDE 10 MINUTOS.")
                     return None
             else:
-                st.error(f"Erro: {error_msg}")
+                st.error(f"Erro na API: {error_msg}")
                 return None
     return None
 
@@ -140,8 +137,6 @@ st.markdown('''
     .termo-consentimento li { color: var(--cinza-texto) !important; }
     .termo-consentimento ul { margin-left: 1.5rem; }
     .termo-consentimento li { margin-bottom: 0.5rem; }
-    .veredito-titulo { font-size: 1.8rem !important; font-weight: 800 !important; }
-    .classificacao-texto { font-size: 1.4rem !important; font-weight: 800 !important; }
     .resumo-final {
         background-color: #e8f5e9; border-left: 4px solid #4caf50;
         padding: 1.5rem; border-radius: 8px; color: #1b5e20 !important;
@@ -170,6 +165,10 @@ def limpar_caso_completo():
     st.session_state.limpar_trigger += 1
     st.session_state.cache_analises = {}
     st.session_state.rate_limiter_calls = []
+    if "modelo_gemini" in st.session_state:
+        del st.session_state.modelo_gemini
+    if "modelo_nome" in st.session_state:
+        del st.session_state.modelo_nome
     st.rerun()
 
 def aplicar_estilo_pericial(texto):
@@ -189,41 +188,41 @@ def aplicar_estilo_pericial(texto):
 
 def extrair_resumo(nivel):
     resumos = {
-        "SEGURO": "Conteúdo legítimo e autêntico.",
-        "FRAUDE CONFIRMADA": "Sinais de fraude confirmada. NÃO prosseguir.",
+        "SEGURO": "Conteudo legitimo e autentico.",
+        "FRAUDE CONFIRMADA": "Sinais de fraude confirmada. NAO prosseguir.",
         "POSSÍVEL FRAUDE": "Elementos suspeitos. Extrema cautela.",
-        "ATENÇÃO": "Pontos que exigem verificação.",
-        "INFORMATIVO": "Análise concluída."
+        "ATENÇÃO": "Pontos que exigem verificacao.",
+        "INFORMATIVO": "Analise concluida."
     }
-    return resumos.get(nivel, "Análise concluída.")
+    return resumos.get(nivel, "Analise concluida.")
 
 def obter_prompt_analise(tipo_arquivo):
-    base = '''Você é PERITO FORENSE DIGITAL. Seja RIGOROSO e CONCLUSIVO.
+    base = '''Voce e PERITO FORENSE DIGITAL. Seja RIGOROSO e CONCLUSIVO.
 
-## 🎯 VEREDITO FINAL
-**CLASSIFICAÇÃO: [FRAUDE CONFIRMADA / POSSÍVEL FRAUDE / ATENÇÃO / SEGURO]**
+## VEREDITO FINAL
+**CLASSIFICACAO: [FRAUDE CONFIRMADA / POSSIVEL FRAUDE / ATENCAO / SEGURO]**
 [Explique em 2-3 linhas porque]
 
-## 📋 ANÁLISE TÉCNICA
-[Liste até 5 indicadores técnicos]
+## ANALISE TECNICA
+[Liste ate 5 indicadores tecnicos]
 
-## ⚠️ RECOMENDAÇÕES
-[2-3 ações específicas]'''
+## RECOMENDACOES
+[2-3 acoes especificas]'''
 
     if tipo_arquivo in ["image/jpeg", "image/png", "image/jpg"]:
         return base + '''
 
-ANÁLISE DE IMAGENS - ATENÇÃO ESPECIAL:
-Verifique sinais de IA/DEEPFAKE: pele artificial, cabelos irreais, olhos inconsistentes, iluminação impossível.
-SE DETECTAR IA EM FOTO REAL -> CLASSIFICAÇÃO: ATENÇÃO ou POSSÍVEL FRAUDE'''
+ANALISE DE IMAGENS - ATENCAO ESPECIAL:
+Verifique sinais de IA/DEEPFAKE: pele artificial, cabelos irreais, olhos inconsistentes, iluminacao impossivel.
+SE DETECTAR IA EM FOTO REAL -> CLASSIFICACAO: ATENCAO ou POSSIVEL FRAUDE'''
 
     elif tipo_arquivo == "message/rfc822" or "eml" in tipo_arquivo.lower():
         return base + '''
 
-ANÁLISE DE E-MAILS - PRIORIDADE: PHISHING
-Verifique: urgência artificial, ameaças, remetente genérico, anexos suspeitos.
-CRITÉRIOS:
-- Remetente genérico + urgência = FRAUDE CONFIRMADA
+ANALISE DE E-MAILS - PRIORIDADE: PHISHING
+Verifique: urgencia artificial, ameacas, remetente generico, anexos suspeitos.
+CRITERIOS:
+- Remetente generico + urgencia = FRAUDE CONFIRMADA
 - Anexo sem nome + assunto vago = FRAUDE CONFIRMADA
 - Solicita dados pessoais/senha = FRAUDE CONFIRMADA'''
 
@@ -238,17 +237,21 @@ def gerar_hash_arquivo(arquivo):
 def analisar_imagem(image, pergunta=""):
     file_hash = gerar_hash_arquivo(image)
     cache_key = f"img_{file_hash}_{pergunta}"
+
     if cache_key in st.session_state.cache_analises:
-        st.success("♻️ Resultado em CACHE - 0 chamadas!")
+        st.success("Resultado em CACHE - 0 chamadas!")
         return st.session_state.cache_analises[cache_key]
+
     try:
         img = Image.open(image)
         img.thumbnail((1024, 1024))
+
         if not inicializar_api():
             return "Erro na API"
 
-        modelo = detectar_modelo_disponivel()
-        model = genai.GenerativeModel(modelo)
+        model = obter_modelo()
+        if not model:
+            return "Erro ao obter modelo"
 
         prompt = obter_prompt_analise("image/jpeg")
         if pergunta:
@@ -259,16 +262,18 @@ def analisar_imagem(image, pergunta=""):
         if resultado:
             st.session_state.cache_analises[cache_key] = resultado
 
-        return resultado or "Não foi possível analisar"
+        return resultado or "Nao foi possivel analisar"
     except Exception as e:
         return f"Erro: {str(e)}"
 
 def analisar_email(arquivo, pergunta=""):
     file_hash = gerar_hash_arquivo(arquivo)
     cache_key = f"eml_{file_hash}_{pergunta}"
+
     if cache_key in st.session_state.cache_analises:
-        st.success("♻️ Resultado em CACHE - 0 chamadas!")
+        st.success("Resultado em CACHE - 0 chamadas!")
         return st.session_state.cache_analises[cache_key]
+
     try:
         msg = BytesParser(policy=policy.default).parsebytes(arquivo.getvalue())
         remetente = msg.get("From", "?")
@@ -281,26 +286,30 @@ def analisar_email(arquivo, pergunta=""):
                     break
         else:
             corpo = msg.get_payload(decode=True).decode(errors="ignore")
+
         anexos = []
         if msg.is_multipart():
             for part in msg.walk():
                 if part.get_content_disposition() == "attachment":
                     anexos.append(part.get_filename() or "sem_nome")
+
         contexto = f'''
 === E-MAIL ===
 Remetente: {remetente}
 Assunto: {assunto}
 Anexos: {", ".join(anexos) if anexos else "Nenhum"}
 
-=== CONTEÚDO ===
+=== CONTEUDO ===
 {corpo[:2000]}
 
-IMPORTANTE: Analise TODO o conteúdo do e-mail acima.'''
+IMPORTANTE: Analise TODO o conteudo do e-mail acima.'''
+
         if not inicializar_api():
             return "Erro na API"
 
-        modelo = detectar_modelo_disponivel()
-        model = genai.GenerativeModel(modelo)
+        model = obter_modelo()
+        if not model:
+            return "Erro ao obter modelo"
 
         prompt = obter_prompt_analise("message/rfc822") + contexto
         if pergunta:
@@ -311,7 +320,7 @@ IMPORTANTE: Analise TODO o conteúdo do e-mail acima.'''
         if resultado:
             st.session_state.cache_analises[cache_key] = resultado
 
-        return resultado or "Não foi possível"
+        return resultado or "Nao foi possivel"
     except Exception as e:
         return f"Erro: {str(e)}"
 
@@ -337,7 +346,7 @@ def gerar_pdf(resultado, nome_arquivo, nivel):
                 pdf.multi_cell(0, 5, linha)
     pdf.ln(10)
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 5, "AuditIA v3.0 AUTO-DETECT", ln=True, align="C")
+    pdf.cell(0, 5, "AuditIA v3.0 PRODUCTION", ln=True, align="C")
     pdf.cell(0, 5, "Vargem Grande do Sul - SP", ln=True, align="C")
     return pdf.output(dest='S').encode('latin-1')
 
@@ -345,32 +354,32 @@ try:
     if os.path.exists("Logo_AI_1.png"):
         st.image(Image.open("Logo_AI_1.png"), use_column_width=True)
 except:
-    st.markdown("# 👁️ AuditIA")
+    st.markdown("# AuditIA")
 
-st.markdown('<p class="subtitle-custom">MODO ULTRA-ECONOMICO: 100 req/min | Auto-detecção de modelo</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle-custom">MODO PRODUCTION: Otimizado para Vendas | 100 req/min</p>', unsafe_allow_html=True)
 
 if not st.session_state.termo_aceito:
     st.markdown("## TERMO DE CONSENTIMENTO")
     st.markdown('''<div class="termo-consentimento">
     <h4>Aviso Legal Importante</h4>
-    <p><strong>O AuditIA é uma ferramenta de apoio</strong> e <strong>NÃO substitui perícia oficial</strong>.</p>
-    <h5>Responsabilidades do Usuário</h5>
+    <p><strong>O AuditIA e uma ferramenta de apoio</strong> e <strong>NAO substitui pericia oficial</strong>.</p>
+    <h5>Responsabilidades do Usuario</h5>
     <ul>
-        <li>Você é <strong>totalmente responsável</strong> pelo uso das análises geradas</li>
-        <li>Os resultados <strong>não devem ser usados como única evidência</strong> em processos legais</li>
+        <li>Voce e <strong>totalmente responsavel</strong> pelo uso das analises geradas</li>
+        <li>Os resultados <strong>nao devem ser usados como unica evidencia</strong> em processos legais</li>
         <li>Respeite a <strong>privacidade</strong> e os <strong>direitos autorais</strong></li>
-        <li>Use a ferramenta de forma <strong>ética e legal</strong></li>
+        <li>Use a ferramenta de forma <strong>etica e legal</strong></li>
     </ul>
-    <h5>Política de Privacidade</h5>
+    <h5>Politica de Privacidade</h5>
     <ul>
-        <li>Os arquivos são processados temporariamente</li>
-        <li>Não armazenamos dados permanentemente</li>
+        <li>Os arquivos sao processados temporariamente</li>
+        <li>Nao armazenamos dados permanentemente</li>
         <li>Utiliza Google Gemini AI</li>
     </ul>
-    <h5>Informações</h5>
+    <h5>Informacoes</h5>
     <p><strong>Desenvolvido em:</strong> Vargem Grande do Sul - SP<br>
-    <strong>Versão:</strong> 3.0 AUTO-DETECT - Fevereiro 2026<br>
-    <strong>Limite:</strong> 100 requisições/minuto (ULTRA CONSERVADOR)</p>
+    <strong>Versao:</strong> 3.0 PRODUCTION READY - Fevereiro 2026<br>
+    <strong>Limite:</strong> 100 requisicoes/minuto (OTIMIZADO)</p>
     </div>''', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -381,44 +390,46 @@ if not st.session_state.termo_aceito:
     st.stop()
 
 with st.sidebar:
-    st.header("Informacoes")
+    st.header("Dashboard")
 
-    if "modelo_detectado" in st.session_state:
-        st.success(f"Modelo: {st.session_state.modelo_detectado}")
+    if "modelo_nome" in st.session_state:
+        st.success(f"Modelo: {st.session_state.modelo_nome}")
 
-    st.warning("""
-MODO ULTRA-ECONOMICO
+    st.info("MODO PRODUCTION - Estavel e confiavel - Otimizado para vendas - Cache inteligente - Rate limiter 100/min")
 
-- Maximo 2 arquivos por vez
-- Delay de 1.5s entre chamadas
-- Limite: 100 req/min
-- Cache agressivo
-- Auto-detecção de modelo
-
-Use com CALMA!
-""")
     st.markdown("---")
     st.subheader("Estatisticas")
-    st.metric("Analises", len(st.session_state.historico_pericial))
-    st.metric("Cache", len(st.session_state.cache_analises))
+    st.metric("Analises Realizadas", len(st.session_state.historico_pericial))
+    st.metric("Resultados em Cache", len(st.session_state.cache_analises))
+
     if st.session_state.rate_limiter_calls:
-        st.metric("Uso API", f"{len(st.session_state.rate_limiter_calls)}/100")
+        uso = len(st.session_state.rate_limiter_calls)
+        st.metric("Uso API (ultimo minuto)", f"{uso}/100")
+
+        if uso > 80:
+            st.warning("Proximo do limite")
+        elif uso > 50:
+            st.info("Uso moderado")
 
 st.header("Upload de Arquivos")
-st.info("DICA: Analise 1-2 arquivos por vez. Aguarde completar antes de enviar mais.")
+st.info("DICA: Analise 1-2 arquivos por vez para melhor desempenho.")
 
 arquivos = st.file_uploader(
-    "Selecione os arquivos (maximo 2 recomendado)",
+    "Selecione os arquivos para analise forense",
     type=["jpg", "jpeg", "png", "pdf", "eml"],
     accept_multiple_files=True,
     key=f"uploader_{st.session_state.limpar_trigger}"
 )
 
 if arquivos and len(arquivos) > 2:
-    st.error("MODO ECONOMICO: Maximo 2 arquivos por vez!")
+    st.warning("Recomendamos maximo 2 arquivos por vez para analise otimizada.")
     arquivos = arquivos[:2]
 
-pergunta = st.text_area("Pergunta Adicional (Opcional)", placeholder="Ex: Este e-mail e phishing?", key="pergunta")
+pergunta = st.text_area(
+    "Pergunta Adicional (Opcional)", 
+    placeholder="Ex: Este e-mail e phishing? Analise os indicadores de fraude.", 
+    key="pergunta"
+)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -429,44 +440,54 @@ with col2:
 
 if analisar and arquivos:
     total = len(arquivos)
-    st.warning(f"Processando {total} arquivo(s) LENTAMENTE para evitar erro de quota...")
+    st.info(f"Processando {total} arquivo(s)...")
+
     progress_bar = st.progress(0)
     status_text = st.empty()
+
     for idx, arq in enumerate(arquivos, 1):
         progresso = idx / total
         progress_bar.progress(progresso)
-        status_text.text(f"Analisando {idx}/{total}: {arq.name} (AGUARDE...)")
+        status_text.text(f"Analisando {idx}/{total}: {arq.name}")
+
         st.markdown(f"### {arq.name}")
+
         if arq.type.startswith("image/"):
             img = Image.open(arq)
             img.thumbnail((300, 300))
             st.image(img, width=300)
-        with st.spinner(f"Analise {idx}/{total} em andamento (modo LENTO)..."):
+
+        with st.spinner(f"Analise forense em andamento ({idx}/{total})..."):
             if idx > 1:
                 st.info("Pausa de seguranca (3s)...")
                 time.sleep(3)
+
             if arq.type in ["image/jpeg", "image/png", "image/jpg"]:
                 res = analisar_imagem(arq, pergunta)
             elif arq.type == "message/rfc822" or arq.name.endswith(".eml"):
                 res = analisar_email(arq, pergunta)
             else:
                 res = "Formato nao suportado"
+
             if res and "Erro" not in res:
                 html_res, cor, nivel = aplicar_estilo_pericial(res)
                 st.markdown(html_res, unsafe_allow_html=True)
+
                 st.markdown(f'''<div class="resumo-final">
-                    <strong>RESUMO</strong><br><br>
+                    <strong>RESUMO DA ANALISE</strong><br><br>
                     <strong>Classificacao:</strong> {nivel}<br><br>
                     <strong>Conclusao:</strong> {extrair_resumo(nivel)}
                 </div>''', unsafe_allow_html=True)
+
                 pdf_bytes = gerar_pdf(res, arq.name, nivel)
                 st.download_button(
                     "Exportar Laudo em PDF",
                     pdf_bytes,
-                    f"Laudo_{arq.name}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    f"Laudo_AuditIA_{arq.name}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                     "application/pdf",
                     key=f"pdf_{idx}"
                 )
+
                 st.session_state.historico_pericial.append({
                     "arquivo": arq.name,
                     "resultado": res,
@@ -474,14 +495,19 @@ if analisar and arquivos:
                     "timestamp": datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
                 })
             else:
-                st.error(f"Nao foi possivel analisar {arq.name}: {res}")
+                st.error(f"Nao foi possivel analisar {arq.name}")
+                if res:
+                    st.error(f"Detalhes: {res}")
+
             st.markdown("---")
+
     progress_bar.progress(1.0)
     status_text.text("Processamento concluido!")
     st.success(f"{total} arquivo(s) analisado(s) com sucesso!")
-    st.info("AGUARDE 3-5 MINUTOS antes de analisar mais arquivos.")
+    st.info("Pronto para venda: Analise completa disponivel para download em PDF.")
+
 elif analisar:
-    st.warning("Envie pelo menos um arquivo.")
+    st.warning("Por favor, faca upload de pelo menos um arquivo.")
 
 if st.session_state.historico_pericial:
     st.header("Historico de Analises")
@@ -491,6 +517,6 @@ if st.session_state.historico_pericial:
             st.markdown(h, unsafe_allow_html=True)
 
 st.markdown("---")
-st.caption("AuditIA v3.0 AUTO-DETECT | Vargem Grande do Sul - SP")
-st.caption("Ferramenta de apoio - Nao substitui pericia oficial")
-st.caption("Detecta automaticamente o modelo Gemini disponivel")
+st.caption("AuditIA v3.0 PRODUCTION READY | Vargem Grande do Sul - SP")
+st.caption("Ferramenta de apoio a decisao - Nao substitui pericia oficial certificada")
+st.caption("Versao otimizada para vendas B2B e B2C")
