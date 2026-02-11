@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 class RateLimiterUltra:
-    def __init__(self, max_calls=120, period=60):
+    def __init__(self, max_calls=100, period=60):
         self.max_calls = max_calls
         self.period = period
         if "rate_limiter_calls" not in st.session_state:
@@ -44,16 +44,40 @@ class RateLimiterUltra:
                 st.session_state.rate_limiter_calls = []
 
         if st.session_state.rate_limiter_calls:
-            time.sleep(1)
+            time.sleep(1.5)
 
         st.session_state.rate_limiter_calls.append(now)
 
         current_usage = len(st.session_state.rate_limiter_calls)
-        if current_usage > 100:
-            st.info(f"Uso API: {current_usage}/120")
+        if current_usage > 80:
+            st.info(f"Uso API: {current_usage}/100")
 
 rate_limiter = RateLimiterUltra()
-MODELO_USAR = 'gemini-1.5-flash'
+
+def detectar_modelo_disponivel():
+    if "modelo_detectado" in st.session_state:
+        return st.session_state.modelo_detectado
+
+    modelos_tentar = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro',
+        'gemini-1.5-pro-latest',
+        'gemini-pro',
+        'gemini-pro-vision'
+    ]
+
+    for modelo in modelos_tentar:
+        try:
+            test_model = genai.GenerativeModel(modelo)
+            test_model.generate_content("test")
+            st.session_state.modelo_detectado = modelo
+            return modelo
+        except:
+            continue
+
+    st.session_state.modelo_detectado = 'gemini-1.5-flash-latest'
+    return 'gemini-1.5-flash-latest'
 
 def inicializar_api():
     try:
@@ -74,12 +98,12 @@ def call_gemini_with_retry(func, max_retries=3):
             error_msg = str(e)
             if "RATE_LIMIT_EXCEEDED" in error_msg or "429" in error_msg or "quota" in error_msg.lower():
                 if tentativa < max_retries - 1:
-                    wait_time = 90 * (tentativa + 1)
+                    wait_time = 120 * (tentativa + 1)
                     st.error(f"LIMITE! Aguardando {wait_time}s... (Tentativa {tentativa + 1}/{max_retries})")
                     time.sleep(wait_time)
                     st.session_state.rate_limiter_calls = []
                 else:
-                    st.error("Quota excedida. AGUARDE 5-10 MINUTOS.")
+                    st.error("Quota excedida. AGUARDE 10 MINUTOS.")
                     return None
             else:
                 st.error(f"Erro: {error_msg}")
@@ -154,9 +178,9 @@ def aplicar_estilo_pericial(texto):
         cor, font, nivel = "#388e3c", "white", "SEGURO"
     elif "FRAUDE CONFIRMADA" in texto_upper or "PHISHING" in texto_upper:
         cor, font, nivel = "#d32f2f", "white", "FRAUDE CONFIRMADA"
-    elif "POSSÍVEL FRAUDE" in texto_upper:
+    elif "POSSÍVEL FRAUDE" in texto_upper or "POSSIVEL FRAUDE" in texto_upper:
         cor, font, nivel = "#f57c00", "white", "POSSÍVEL FRAUDE"
-    elif "ATENÇÃO" in texto_upper or "IA" in texto_upper:
+    elif "ATENÇÃO" in texto_upper or "ATENCAO" in texto_upper or "IA" in texto_upper:
         cor, font, nivel = "#fbc02d", "black", "ATENÇÃO"
     else:
         cor, font, nivel = "#1976d2", "white", "INFORMATIVO"
@@ -215,20 +239,26 @@ def analisar_imagem(image, pergunta=""):
     file_hash = gerar_hash_arquivo(image)
     cache_key = f"img_{file_hash}_{pergunta}"
     if cache_key in st.session_state.cache_analises:
-        st.success("Resultado em CACHE - 0 chamadas!")
+        st.success("♻️ Resultado em CACHE - 0 chamadas!")
         return st.session_state.cache_analises[cache_key]
     try:
         img = Image.open(image)
         img.thumbnail((1024, 1024))
         if not inicializar_api():
             return "Erro na API"
-        model = genai.GenerativeModel(MODELO_USAR)
+
+        modelo = detectar_modelo_disponivel()
+        model = genai.GenerativeModel(modelo)
+
         prompt = obter_prompt_analise("image/jpeg")
         if pergunta:
             prompt += f"\n\nPERGUNTA: {pergunta}"
+
         resultado = call_gemini_with_retry(lambda: model.generate_content([prompt, img]).text)
+
         if resultado:
             st.session_state.cache_analises[cache_key] = resultado
+
         return resultado or "Não foi possível analisar"
     except Exception as e:
         return f"Erro: {str(e)}"
@@ -237,7 +267,7 @@ def analisar_email(arquivo, pergunta=""):
     file_hash = gerar_hash_arquivo(arquivo)
     cache_key = f"eml_{file_hash}_{pergunta}"
     if cache_key in st.session_state.cache_analises:
-        st.success("Resultado em CACHE - 0 chamadas!")
+        st.success("♻️ Resultado em CACHE - 0 chamadas!")
         return st.session_state.cache_analises[cache_key]
     try:
         msg = BytesParser(policy=policy.default).parsebytes(arquivo.getvalue())
@@ -268,13 +298,19 @@ Anexos: {", ".join(anexos) if anexos else "Nenhum"}
 IMPORTANTE: Analise TODO o conteúdo do e-mail acima.'''
         if not inicializar_api():
             return "Erro na API"
-        model = genai.GenerativeModel(MODELO_USAR)
+
+        modelo = detectar_modelo_disponivel()
+        model = genai.GenerativeModel(modelo)
+
         prompt = obter_prompt_analise("message/rfc822") + contexto
         if pergunta:
             prompt += f"\n\nPERGUNTA: {pergunta}"
+
         resultado = call_gemini_with_retry(lambda: model.generate_content(prompt).text)
+
         if resultado:
             st.session_state.cache_analises[cache_key] = resultado
+
         return resultado or "Não foi possível"
     except Exception as e:
         return f"Erro: {str(e)}"
@@ -301,7 +337,7 @@ def gerar_pdf(resultado, nome_arquivo, nivel):
                 pdf.multi_cell(0, 5, linha)
     pdf.ln(10)
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 5, "AuditIA v3.0 ULTRA-ECONOMICO", ln=True, align="C")
+    pdf.cell(0, 5, "AuditIA v3.0 AUTO-DETECT", ln=True, align="C")
     pdf.cell(0, 5, "Vargem Grande do Sul - SP", ln=True, align="C")
     return pdf.output(dest='S').encode('latin-1')
 
@@ -311,7 +347,7 @@ try:
 except:
     st.markdown("# 👁️ AuditIA")
 
-st.markdown('<p class="subtitle-custom">MODO ULTRA-ECONOMICO: 120 req/min | Processamento LENTO</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle-custom">MODO ULTRA-ECONOMICO: 100 req/min | Auto-detecção de modelo</p>', unsafe_allow_html=True)
 
 if not st.session_state.termo_aceito:
     st.markdown("## TERMO DE CONSENTIMENTO")
@@ -333,8 +369,8 @@ if not st.session_state.termo_aceito:
     </ul>
     <h5>Informações</h5>
     <p><strong>Desenvolvido em:</strong> Vargem Grande do Sul - SP<br>
-    <strong>Versão:</strong> 3.0 ULTRA-ECONÔMICO - Fevereiro 2026<br>
-    <strong>Limite:</strong> 120 requisições/minuto (FREE TIER)</p>
+    <strong>Versão:</strong> 3.0 AUTO-DETECT - Fevereiro 2026<br>
+    <strong>Limite:</strong> 100 requisições/minuto (ULTRA CONSERVADOR)</p>
     </div>''', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -346,13 +382,18 @@ if not st.session_state.termo_aceito:
 
 with st.sidebar:
     st.header("Informacoes")
+
+    if "modelo_detectado" in st.session_state:
+        st.success(f"Modelo: {st.session_state.modelo_detectado}")
+
     st.warning("""
 MODO ULTRA-ECONOMICO
 
 - Maximo 2 arquivos por vez
-- Delay de 1s entre chamadas
-- Limite: 120 req/min
+- Delay de 1.5s entre chamadas
+- Limite: 100 req/min
 - Cache agressivo
+- Auto-detecção de modelo
 
 Use com CALMA!
 """)
@@ -361,7 +402,7 @@ Use com CALMA!
     st.metric("Analises", len(st.session_state.historico_pericial))
     st.metric("Cache", len(st.session_state.cache_analises))
     if st.session_state.rate_limiter_calls:
-        st.metric("Uso API", f"{len(st.session_state.rate_limiter_calls)}/120")
+        st.metric("Uso API", f"{len(st.session_state.rate_limiter_calls)}/100")
 
 st.header("Upload de Arquivos")
 st.info("DICA: Analise 1-2 arquivos por vez. Aguarde completar antes de enviar mais.")
@@ -402,8 +443,8 @@ if analisar and arquivos:
             st.image(img, width=300)
         with st.spinner(f"Analise {idx}/{total} em andamento (modo LENTO)..."):
             if idx > 1:
-                st.info("Pausa de seguranca (2s)...")
-                time.sleep(2)
+                st.info("Pausa de seguranca (3s)...")
+                time.sleep(3)
             if arq.type in ["image/jpeg", "image/png", "image/jpg"]:
                 res = analisar_imagem(arq, pergunta)
             elif arq.type == "message/rfc822" or arq.name.endswith(".eml"):
@@ -433,12 +474,12 @@ if analisar and arquivos:
                     "timestamp": datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
                 })
             else:
-                st.error(f"Nao foi possivel analisar {arq.name}")
+                st.error(f"Nao foi possivel analisar {arq.name}: {res}")
             st.markdown("---")
     progress_bar.progress(1.0)
     status_text.text("Processamento concluido!")
     st.success(f"{total} arquivo(s) analisado(s) com sucesso!")
-    st.info("AGUARDE 2-3 MINUTOS antes de analisar mais arquivos.")
+    st.info("AGUARDE 3-5 MINUTOS antes de analisar mais arquivos.")
 elif analisar:
     st.warning("Envie pelo menos um arquivo.")
 
@@ -450,6 +491,6 @@ if st.session_state.historico_pericial:
             st.markdown(h, unsafe_allow_html=True)
 
 st.markdown("---")
-st.caption("AuditIA v3.0 ULTRA-ECONOMICO | Vargem Grande do Sul - SP")
+st.caption("AuditIA v3.0 AUTO-DETECT | Vargem Grande do Sul - SP")
 st.caption("Ferramenta de apoio - Nao substitui pericia oficial")
-st.caption("Modo LENTO para respeitar limite de 200 req/min")
+st.caption("Detecta automaticamente o modelo Gemini disponivel")
