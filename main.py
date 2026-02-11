@@ -45,7 +45,7 @@ st.markdown("""
         width: 100%;
         padding: 0.5rem 1rem;
         border-radius: 8px;
-        font-weight: 500;
+        font-weight: 1000;
         transition: all 0.3s;
         margin: 0.25rem 0;
     }
@@ -636,3 +636,4 @@ if st.session_state.historico_pericial:
 st.markdown("---")
 st.caption("👁️ AuditIA v2.0 | Desenvolvido em Vargem Grande do Sul - SP | © 2026")
 st.caption("⚠️ Ferramenta de apoio - Não substitui perícia oficial")
+
