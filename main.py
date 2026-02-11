@@ -45,7 +45,7 @@ st.markdown("""
         width: 100%;
         padding: 0.5rem 1rem;
         border-radius: 8px;
-        font-weight: 1000;
+        font-weight: 500;
         transition: all 0.3s;
         margin: 0.25rem 0;
     }
@@ -373,12 +373,12 @@ def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
 try:
     if os.path.exists("Logo_AI_1.png"):
         logo = Image.open("Logo_AI_1.png")
-        st.image(logo, width=500)  # Logo MAIOR
+        st.image(logo, width=1000)  # Logo MAIOR
 except:
     pass  # Se não tiver logo, não mostra nada
 
 # Subtítulo pequeno (SEM título grande redundante)
-st.markdown('<p class="subtitle-custom">Inteligência Forense Digital | Desenvolvido em Vargem Grande do Sul - SP</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle-custom">Inteligência Forense Digital</p>', unsafe_allow_html=True)
 
 # ==================== TERMO DE CONSENTIMENTO ====================
 with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES DE USAR", expanded=not st.session_state.termo_aceito):
@@ -636,4 +636,5 @@ if st.session_state.historico_pericial:
 st.markdown("---")
 st.caption("👁️ AuditIA v2.0 | Desenvolvido em Vargem Grande do Sul - SP | © 2026")
 st.caption("⚠️ Ferramenta de apoio - Não substitui perícia oficial")
+
 
