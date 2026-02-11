@@ -22,8 +22,12 @@ st.set_page_config(
 # Configurar API do Gemini
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    # Detectar modelo disponível automaticamente
+    modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    MODELO_USAR = modelos_disponiveis[0] if modelos_disponiveis else 'gemini-1.5-flash'
 except Exception as e:
-    st.error("⚠️ Erro ao configurar API do Gemini. Verifique as configurações.")
+    st.error(f"⚠️ Erro ao configurar API do Gemini: {str(e)}")
+    st.info("💡 Verifique se a API Key está configurada corretamente em .streamlit/secrets.toml")
     st.stop()
 
 # ==================== ESTILO CUSTOMIZADO ====================
@@ -110,6 +114,15 @@ st.markdown("""
         background-color: #fef3c7;
         border-radius: 8px;
         margin: 1rem 0;
+    }
+
+    /* Ajustar tamanho do subtítulo */
+    .subtitle-custom {
+        font-size: 0.9rem;
+        color: #64748b;
+        font-weight: 400;
+        margin-top: -0.5rem;
+        margin-bottom: 1.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -276,7 +289,7 @@ def analisar_imagem(image, pergunta_usuario=""):
         img = Image.open(image)
         img.thumbnail((1024, 1024))
 
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel(MODELO_USAR)
         prompt = obter_prompt_analise("image/jpeg")
 
         if pergunta_usuario:
@@ -328,7 +341,7 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
         DKIM: {'Presente' if 'não disponível' not in dkim.lower() else 'Ausente'}
         """
 
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel(MODELO_USAR)
         prompt = obter_prompt_analise("message/rfc822") + f"\n\n{contexto}"
 
         if pergunta_usuario:
@@ -342,7 +355,7 @@ def analisar_email(arquivo_email, pergunta_usuario=""):
 def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
     """Análise de PDF"""
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel(MODELO_USAR)
         prompt = obter_prompt_analise("application/pdf")
 
         if pergunta_usuario:
@@ -356,20 +369,16 @@ def analisar_pdf(arquivo_pdf, pergunta_usuario=""):
 
 # ==================== INTERFACE PRINCIPAL ====================
 
-# Logo e cabeçalho
+# Logo (MAIOR e sem texto redundante)
 try:
-    # Tentar carregar logo local
     if os.path.exists("Logo_AI_1.png"):
         logo = Image.open("Logo_AI_1.png")
-        st.image(logo, width=200)
-    else:
-        # Fallback: usar emoji
-        st.markdown("# 👁️")
+        st.image(logo, width=500)  # Logo MAIOR
 except:
-    st.markdown("# 👁️")
+    pass  # Se não tiver logo, não mostra nada
 
-st.title("👁️ AuditIA - Inteligência Forense Digital")
-st.caption("Análise pericial automatizada com IA | Desenvolvido em Vargem Grande do Sul - SP")
+# Subtítulo pequeno (SEM título grande redundante)
+st.markdown('<p class="subtitle-custom">Inteligência Forense Digital | Desenvolvido em Vargem Grande do Sul - SP</p>', unsafe_allow_html=True)
 
 # ==================== TERMO DE CONSENTIMENTO ====================
 with st.expander("⚖️ TERMO DE CONSENTIMENTO E USO RESPONSÁVEL - LEIA ANTES DE USAR", expanded=not st.session_state.termo_aceito):
@@ -432,7 +441,7 @@ with st.sidebar:
         st.markdown("""
         O **AuditIA** é uma plataforma de **Inteligência Forense Digital** que combina:
 
-        - 🤖 **IA Avançada** (Gemini 1.5)
+        - 🤖 **IA Avançada** (Gemini)
         - 🔍 **Análise Multimodal** (imagens, e-mails, PDFs)
         - 🎭 **Psicologia Forense** (detecção de manipulação)
         - 🔐 **Verificação Técnica** (metadados, autenticação)
