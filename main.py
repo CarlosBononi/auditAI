@@ -248,17 +248,17 @@ def gerar_pdf_pericial_completo(conteudo, data, arquivos):
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 5, txt="AuditIA - Vargem Grande do Sul - SP", ln=True, align="C")
+    pdf.cell(0, 5, txt="AuditIA - Inteligencia Pericial Senior", ln=True, align="C")
 
     return pdf.output(dest='S').encode('latin-1')
 
-# BOTOES (MANTIDOS ORIGINAIS COM CORREÇÃO ESPECÍFICA NA ANÁLISE)
+# BOTOES E EXECUCAO DA PERICIA
 col1, col2, col3 = st.columns([2, 2, 1])
 
 with col1:
     if st.button("🔬 EXECUTAR PERICIA TECNICA", on_click=processar_pericia, type="primary", use_container_width=True):
 
-        # VERIFICAR RATE LIMIT (MANTIDO ORIGINAL)
+        # VERIFICAR RATE LIMIT (MANTIDO ORIGINAL DA INTERFACE)
         tempo_atual = time.time()
         tempo_decorrido = tempo_atual - st.session_state.ultima_requisicao
 
@@ -349,10 +349,26 @@ Pergunta: {pergunta_efetiva}"""
 
                     contexto.append(f"PERGUNTA PRINCIPAL: {pergunta_efetiva}")
 
-                    response = model.generate_content(
-                        contexto, 
-                        request_options={"timeout": 120}
-                    )
+                    # --- INÍCIO DA BLINDAGEM CONTRA LIMITE DE API (BACKOFF EXPONENCIAL) ---
+                    def chamar_api_com_resiliencia(ctx, max_tentativas=4):
+                        espera = 5  # Segundos iniciais de espera
+                        for tentativa in range(max_tentativas):
+                            try:
+                                return model.generate_content(ctx, request_options={"timeout": 120})
+                            except Exception as erro_api:
+                                msg_erro = str(erro_api).lower()
+                                if tentativa == max_tentativas - 1:
+                                    raise erro_api  # Estoura o erro apenas se falhar todas as vezes
+                                
+                                # Se o erro for de Cota (429), Rate Limit ou Servidor (500, 503)
+                                if "429" in msg_erro or "quota" in msg_erro or "rate" in msg_erro or "503" in msg_erro or "500" in msg_erro:
+                                    time.sleep(espera)
+                                    espera *= 2  # Dobra o tempo: espera 5s, depois 10s, depois 20s...
+                                else:
+                                    raise erro_api  # Se for outro erro (ex: arquivo corrompido), não repete
+
+                    response = chamar_api_com_resiliencia(contexto)
+                    # --- FIM DA BLINDAGEM ---
 
                     # CORREÇÃO PÓS-PROCESSAMENTO ESPECÍFICA PARA IMAGENS IA
                     resposta_texto = response.text
@@ -493,8 +509,7 @@ with st.expander("📖 CENTRAL DE AJUDA AUDITIA - Conhecimento Tecnico e FAQ", e
         st.markdown("""
 ### 🌟 A Missao AuditIA
 
-Nascido em **Vargem Grande do Sul - SP**, o AuditIA foi concebido para unir a **psicologia forense** 
-a tecnologia de ponta em **Inteligencia Artificial Multimodal**. O projeto surgiu da necessidade 
+O AuditIA foi concebido para unir a **psicologia forense** a tecnologia de ponta em **Inteligencia Artificial Multimodal**. O projeto surgiu da necessidade 
 de identificar **micro-anomalias em comunicacoes digitais** que fogem ao olho humano comum.
 
 ---
@@ -1033,5 +1048,5 @@ Ao utilizar esta ferramenta, voce declara ciencia e concordancia com:
 """)
 
 st.caption(f"👁️ **AuditIA © {datetime.now().year}** - Tecnologia Forense Multimodal de Alta Precisao")
-st.caption("Desenvolvido em **Vargem Grande do Sul - SP** | Versao **2.0 COMPLETA**")
+st.caption("Versao **2.0 COMPLETA**")
 st.caption("⚖️ Ferramenta de apoio pericial - Nao substitui pericia oficial | LGPD Compliant")
