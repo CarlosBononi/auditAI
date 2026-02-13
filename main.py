@@ -1,83 +1,79 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-from fpdf import FPDF
 import io
 import email
 from email import policy
 from datetime import datetime
 import pytz
-import re
 import time
 
-# 1. INICIALIZAÇÃO DE SESSÃO (PROTEÇÃO DE ESTADO)
-def init_session():
-    defaults = {
-        "historico_pericial": [],
-        "arquivos_acumulados": [],
-        "termo_aceito": False,
-        "ultima_requisicao": 0,
-        "chat_suporte": [{"role": "assistant", "content": "Olá! Sou o Concierge AuditIA. Como posso facilitar sua investigação hoje?"}]
-    }
-    for key, val in defaults.items():
-        if key not in st.session_state: st.session_state[key] = val
+# 1. INICIALIZAÇÃO DE SESSÃO E MESA DE PERÍCIA
+if "historico_pericial" not in st.session_state:
+    st.session_state.historico_pericial = []
+if "arquivos_acumulados" not in st.session_state:
+    st.session_state.arquivos_acumulados = []
+if "termo_aceito" not in st.session_state:
+    st.session_state.termo_aceito = False
 
-init_session()
+def processar_pericia():
+    st.session_state.pergunta_ativa = st.session_state.campo_pergunta
+    st.session_state.campo_pergunta = "" 
 
 st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
 
-# 2. TERMÔMETRO DE CORES (HARMONIA E SOBERANIA)
+# 2. TERMÔMETRO DE CORES (SOBERANIA VERDE)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     if any(t in texto_upper for t in ["CLASSIFICACAO: SEGURO", "VEREDITO: SEGURO", "LEGITIMO"]):
-        cor, icon = "#27ae60", "🟢" # Verde
-    elif any(t in texto_upper for t in ["FRAUDE CONFIRMADA", "GOLPE", "CRIME"]):
-        cor, icon = "#c0392b", "🔴" # Vermelho
-    elif any(t in texto_upper for t in ["POSSIVEL FRAUDE", "PHISHING", "SUSPEITO"]):
-        cor, icon = "#d35400", "🟠" # Laranja
-    elif any(t in texto_upper for t in ["ATENCAO", "IMAGEM", "FOTO", "IA"]):
-        cor, icon = "#f1c40f", "🟡" # Amarelo
+        cor, icon = "#27ae60", "🟢"
+    elif any(t in texto_upper for t in ["FRAUDE CONFIRMADA", "GOLPE", "FAKE"]):
+        cor, icon = "#c0392b", "🔴"
+    elif any(t in texto_upper for t in ["POSSIVEL FRAUDE", "PHISHING"]):
+        cor, icon = "#d35400", "🟠"
+    elif any(t in texto_upper for t in ["ATENCAO", "IA", "FOTO"]):
+        cor, icon = "#f1c40f", "🟡"
     else:
-        cor, icon = "#2980b9", "🔵" # Azul
+        cor, icon = "#2980b9", "🔵"
 
-    return f'''<div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: white; 
+    return f'''<div style="background-color: {cor}; padding: 20px; border-radius: 12px; color: white; 
                 font-weight: bold; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                 {icon} ANÁLISE FORENSE:<br><br>{texto.replace(chr(10), "<br>")}</div>'''
 
-# CSS - BOTÕES SUAVES E HARMONIZADOS
+# 3. CSS PARA BOTÕES EM HARMONIA (FIX ERRO ROSA)
 st.markdown("""
 <style>
     .stApp { background-color: #ffffff; }
-    /* Botão Executar (Azul Profissional) */
-    div.stButton > button:first-child { background-color: #2980b9; color: white; border-radius: 8px; font-weight: bold; height: 3.5em; width: 100%; border: none; }
-    /* Botão Limpar (Cinza Suave) */
-    div.stButton > button[kind="secondary"] { background-color: #f8f9fa; color: #7f8c8d; border: 1px solid #dee2e6; border-radius: 8px; height: 3.5em; width: 100%; }
-    div.stButton > button:hover { opacity: 0.8; border: 1px solid #2ecc71; }
+    div.stButton > button { border-radius: 8px; font-weight: bold; height: 3.5em; width: 100%; transition: 0.3s; }
+    /* Botão Executar */
+    div.stButton > button:first-child { background-color: #2980b9; color: white; border: none; }
+    /* Botão Limpar (Estilo Cinza Suave sem usar 'kind') */
+    div.stButton > button:hover { border: 1px solid #2ecc71; opacity: 0.8; }
 </style>
 """, unsafe_allow_html=True)
 
-# 3. CONEXÃO SEGURA
+# 4. CONEXÃO DINÂMICA (FIX ERRO 404)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("Erro de conexão. Verifique sua chave API."); st.stop()
+    # O código agora descobre qual modelo está vivo na sua conta
+    model_list = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    model = genai.GenerativeModel(model_list[0] if model_list else 'gemini-1.5-flash')
+except Exception as e:
+    st.error(f"Erro de Conexão: {e}"); st.stop()
 
-# 4. CABEÇALHO E TERMO
-try:
-    st.image(Image.open("Logo_AI_1.png"), width=500)
-except:
-    st.title("👁️ AuditIA")
+# 5. CABEÇALHO E TERMO
+try: st.image(Image.open("Logo_AI_1.png"), width=500)
+except: st.title("👁️ AuditIA")
 
 if not st.session_state.termo_aceito:
-    st.warning("### ⚖️ TERMO DE CONSENTIMENTO\nFerramenta de IA Forense. Resultados são probabilisticos e exigem validação humana oficial.")
+    st.warning("### ⚖️ TERMO DE CONSENTIMENTO\nIA Forense. Resultados probabilísticos. Exige validação humana oficial.")
     if st.button("🚀 ACEITAR E PROSSEGUIR"):
         st.session_state.termo_aceito = True; st.rerun()
     st.stop()
 
-# 5. INTERFACE DE PERÍCIA
+# 6. MESA DE PERÍCIA E MINIATURAS
 st.markdown("---")
-new_files = st.file_uploader("📂 Upload de Provas (Prints, PDFs, E-mails):", type=["jpg", "png", "jpeg", "pdf", "eml"], accept_multiple_files=True)
+new_files = st.file_uploader("📂 Upload de Provas (E-mails, PDFs, Imagens):", type=["jpg", "png", "jpeg", "pdf", "eml"], accept_multiple_files=True)
 
 if new_files:
     for f in new_files:
@@ -98,14 +94,12 @@ for bloco in st.session_state.historico_pericial:
 
 user_query = st.text_area("📝 Pergunta ao Perito:", placeholder="Ex: Analise a veracidade desta evidência.", height=100)
 
-# 6. MOTOR PERICIAL OTIMIZADO (PREVENÇÃO DE ERRO DE LIMITE)
-def call_api_resilient(ctx):
-    for attempt in range(3):
-        try:
-            return model.generate_content(ctx, request_options={"timeout": 120})
+# 7. MOTOR PERICIAL COM BACKOFF (FIX ERRO 429)
+def call_api_safe(ctx):
+    for i in range(3):
+        try: return model.generate_content(ctx, request_options={"timeout": 200})
         except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower():
-                time.sleep(5 * (attempt + 1)) # Espera progressiva
+            if "429" in str(e): time.sleep(5 * (i + 1)) # Espera se bater no limite
             else: raise e
     return None
 
@@ -116,58 +110,33 @@ with c1:
             st.warning("Insira material.")
         else:
             tz = pytz.timezone("America/Sao_Paulo"); agora = datetime.now(tz).strftime("%d/%m/%Y %H:%M")
-            with st.spinner("🕵️ Realizando varredura técnica otimizada..."):
+            with st.spinner("🕵️ AuditIA analisando..."):
                 try:
-                    # PROMPT COMPRIMIDO PARA ECONOMIZAR COTA (FIX ERRO 429)
-                    instrucao = f"Aja como AuditIA, perito sênior. Hoje: {agora}. Regras: 1. Inicie com CLASSIFICACAO: [TIPO]. 2. Se seguro, use CLASSIFICACAO: SEGURO. 3. Analise metadados, anatomia IA (12 pontos) e SPF/DKIM. 4. Seja técnico e direto."
-                    
-                    contexto = [instrucao]
-                    # Adiciona apenas o último histórico para não pesar a API
-                    if st.session_state.historico_pericial:
-                        contexto.append(f"ÚLTIMO CONTEXTO: {st.session_state.historico_pericial[-1][:500]}")
-                    
+                    # PROMPT CURTO (ECONOMIA DE CRÉDITOS)
+                    prompt = [f"AuditIA sênior. Hoje: {agora}. Regras: 1.Inicie CLASSIFICACAO: [TIPO]. 2.Se seguro, use CLASSIFICACAO: SEGURO. 3.Analise anatomia IA (12 pontos) e metadados. 4.Seja técnico."]
                     for f in st.session_state.arquivos_acumulados:
-                        if f["name"].endswith(".eml"):
-                            msg = email.message_from_bytes(f["content"], policy=policy.default)
-                            contexto.append(f"E-MAIL: {msg.get_body(preferencelist=('plain')).get_content()[:1000]}")
-                        elif "pdf" in f["type"]: contexto.append({"mime_type": "application/pdf", "data": f["content"]})
-                        else: contexto.append(Image.open(io.BytesIO(f["content"])).convert("RGB"))
+                        if f["name"].endswith(".eml"): prompt.append(f"E-MAIL: {f['content'][:1000]}")
+                        elif "pdf" in f["type"]: prompt.append({"mime_type": "application/pdf", "data": f["content"]})
+                        else: prompt.append(Image.open(io.BytesIO(f["content"])).convert("RGB"))
+                    prompt.append(f"Pergunta: {user_query}")
                     
-                    contexto.append(f"PERGUNTA: {user_query}")
-                    response = call_api_resilient(contexto)
-                    if response:
-                        st.session_state.historico_pericial.append(response.text)
-                        st.rerun()
-                    else: st.error("Limite de API persistente. Aguarde 60 segundos.")
-                except Exception as e: st.error(f"Erro: {e}")
+                    res = call_api_safe(prompt)
+                    if res: st.session_state.historico_pericial.append(res.text); st.rerun()
+                except Exception as e: st.error(f"Falha técnica: {e}")
 
 with c2:
-    if st.button("🗑️ LIMPAR CASO", type="secondary"):
+    if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []; st.session_state.arquivos_acumulados = []; st.rerun()
 
-# 7. CONCIERGE "ROBO" (SUPORTE HUMANIZADO)
+# 8. CENTRAL DE AJUDA (CONTEÚDO DENSO EXIGIDO)
 st.markdown("---")
-with st.expander("💬 Atendimento AuditIA - Suporte Especializado", expanded=False):
-    for msg in st.session_state.chat_suporte:
-        with st.chat_message(msg["role"]): st.write(msg["content"])
-    
-    if prompt_robo := st.chat_input("Dúvida sobre limites ou precisão?"):
-        st.session_state.chat_suporte.append({"role": "user", "content": prompt_robo})
-        with st.chat_message("user"): st.write(prompt_robo)
-        try:
-            res = model.generate_content(f"Você é o Concierge AuditIA. Responda de forma humanizada e técnica: {prompt_robo}")
-            st.session_state.chat_suporte.append({"role": "assistant", "content": res.text})
-            st.rerun()
-        except: st.write("Tive uma pequena oscilação. Detalhe sua dúvida ou use o Manual abaixo.")
-
-# 8. CENTRAL DE AJUDA (CONTEÚDO COMPLETO)
 with st.expander("📖 Central de Ajuda AuditIA - Conhecimento Técnico e FAQ"):
-    tab1, tab2, tab3 = st.tabs(["A Origem", "Manual de Operação", "FAQ Técnico"])
-    with tab1:
-        st.markdown("### 🧬 A Missão AuditIA\nNascido em **Vargem Grande do Sul - SP**, o AuditIA une psicologia forense à tecnologia. Auditamos: Análise Documental, IA, e-Discovery, Phishing, Física da Luz, Ponzi e Metadados.")
-    with tab2:
-        st.markdown("### 🛠️ Como Auditar\n1. Upload de até 5 arquivos. 2. Pergunte 'Analise a textura de pele'. 3. Siga o termômetro: Verde (Seguro) a Vermelho (Fraude).")
-    with tab3:
-        st.markdown("**P: Qual a precisão?** R: Analisamos 12 marcadores técnicos. Precisão >95% em arquivos originais.")
+    t1, t2, t3 = st.tabs(["A Origem", "Manual Operacional", "FAQ"])
+    with t1:
+        st.markdown("### 🧬 Missão AuditIA\nNascido em **Vargem Grande do Sul - SP**, o AuditIA une psicologia forense e tecnologia de ponta para desmascarar fraudes digitais.")
+    with t2:
+        st.markdown("### 🛠️ Pilares Forenses\n1. Análise Documental. 2. Detecção de IA (12 marcadores). 3. e-Discovery. 4. Física da Luz.")
+    with t3:
+        st.markdown("**P: Qual a precisão?** R: Acima de 95% em arquivos originais.\n**P: Onde ficam os dados?** R: Memória volátil (RAM), deletados ao limpar.")
 
-st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP | Versão 2.0 Otimizada")
+st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP | Versão Elite 2.0")
