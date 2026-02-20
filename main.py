@@ -7,16 +7,23 @@ from email import policy
 from datetime import datetime
 import pytz
 import time
-import fitz  # PyMuPDF: pip install pymupdf
+import base64  # Adicionado para PDF correto
 
-# Inicialização de sessão (limpa arquivos_gemini desnecessário)
-if "historico_pericial" not in st.session_state: st.session_state.historico_pericial = []
-if "arquivos_acumulados" not in st.session_state: st.session_state.arquivos_acumulados = []
-if "termo_aceito" not in st.session_state: st.session_state.termo_aceito = False
-if "pergunta_ativa" not in st.session_state: st.session_state.pergunta_ativa = ""
+# 1. GESTÃO DE SESSÃO E MESA DE PERÍCIA
+if "historico_pericial" not in st.session_state:
+    st.session_state.historico_pericial = []
+if "arquivos_acumulados" not in st.session_state:
+    st.session_state.arquivos_acumulados = []
+if "termo_aceito" not in st.session_state:
+    st.session_state.termo_aceito = False
+
+def processar_pericia():
+    st.session_state.pergunta_ativa = st.session_state.campo_pergunta
+    st.session_state.campo_pergunta = "" 
 
 st.set_page_config(page_title="AuditIA - Inteligência Pericial Sênior", page_icon="👁️", layout="centered")
 
+# 2. TERMÔMETRO DE CORES (FIX DE ASSOCIAÇÃO)
 def aplicar_estilo_pericial(texto):
     texto_upper = texto.upper()
     if "CLASSIFICACAO: SEGURO" in texto_upper: cor = "#27ae60"
@@ -24,12 +31,13 @@ def aplicar_estilo_pericial(texto):
     elif "POSSIVEL FRAUDE" in texto_upper: cor = "#d35400"
     elif "ATENCAO" in texto_upper or "IA" in texto_upper: cor = "#f1c40f"
     else: cor = "#2980b9"
+
     return f'''<div style="background-color: {cor}; padding: 25px; border-radius: 12px; color: white; 
                 font-weight: bold; margin-bottom: 20px; border-left: 10px solid rgba(0,0,0,0.2);">
                 {texto.replace(chr(10), "<br>")}</div>'''
 
-st.markdown("""
-<style>
+# 3. CSS HARMONIZADO
+st.markdown("""<style>
     .stApp { background-color: #ffffff; }
     div.stButton > button { border-radius: 8px; font-weight: bold; height: 3.5em; width: 100%; transition: 0.3s; }
     div.stButton > button:first-child { background-color: #2c3e50; color: white; border: none; }
@@ -37,111 +45,119 @@ st.markdown("""
     .stTextArea textarea { background-color: #f8f9fa; border: 1px solid #d1d5db; }
 </style>""", unsafe_allow_html=True)
 
-# Conexão
+# 4. CONEXÃO SEGURA (MODELO FIX)
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')  # Modelo estável sem 404
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')  # Versão estável sem 404
 except Exception as e:
-    st.error(f"Erro API: {e}. Verifique key e quota.")
+    st.error(f"Erro de Conexão: {e}")
     st.stop()
 
-# Header/Termo
-try: st.image(Image.open("Logo_AI_1.png"), width=500)
-except: st.title("👁️ AuditIA")
+# 5. HEADER E TERMO
+try: 
+    st.image(Image.open("Logo_AI_1.png"), width=500)
+except: 
+    st.title("👁️ AuditIA")
 
 if not st.session_state.termo_aceito:
-    st.warning("### ⚖️ TERMO DE CONSENTIMENTO\nIA Forense probabilística. Validação humana obrigatória.")
-    if st.button("🚀 ACEITAR"): st.session_state.termo_aceito = True; st.rerun()
+    st.warning("### ⚖️ TERMO DE CONSENTIMENTO\nIA Forense. Resultados probabilísticos sujeitos a erro. Validação humana obrigatória.")
+    if st.button("🚀 ACEITAR E PROSSEGUIR"):
+        st.session_state.termo_aceito = True
+        st.rerun()
     st.stop()
 
+# 6. MESA DE PERÍCIA
 st.markdown("---")
-new_files = st.file_uploader("📂 Upload Provas:", type=["jpg", "png", "jpeg", "pdf", "eml"], accept_multiple_files=True)
+new_files = st.file_uploader("📂 Upload de Provas (E-mails, PDFs, Imagens):", type=["jpg", "png", "jpeg", "pdf", "eml"], accept_multiple_files=True)
 
 if new_files:
     for f in new_files:
         if f.name not in [x["name"] for x in st.session_state.arquivos_acumulados]:
-            content = f.read()
-            st.session_state.arquivos_acumulados.append({"name": f.name, "content": content, "type": f.type})
-            st.success(f"✅ {f.name} carregado!")
+            st.session_state.arquivos_acumulados.append({"name": f.name, "content": f.read(), "type": f.type})
 
-# Visualizar Mesa
 if st.session_state.arquivos_acumulados:
-    st.write("📦 **Mesa de Perícia:**")
+    st.write("📦 **Mesa de Perícia (Evidências):**")
     cols = st.columns(5)
     for i, f in enumerate(st.session_state.arquivos_acumulados):
         with cols[i % 5]:
-            if f["type"].startswith("image"): st.image(io.BytesIO(f["content"]), width=100, caption=f["name"])
-            else: st.write("📄" if ".pdf" in f["name"].lower() else "📧", caption=f["name"][:15])
+            if f["type"].startswith("image"): 
+                st.image(io.BytesIO(f["content"]), width=100)
+            else: 
+                st.write("📄" if "pdf" in f["type"].lower() or ".pdf" in f["name"].lower() else "📧")
+            st.caption(f["name"][:10])
 
 st.subheader("🕵️ Linha de Investigação")
 for bloco in st.session_state.historico_pericial:
     st.markdown(aplicar_estilo_pericial(bloco), unsafe_allow_html=True)
 
-st.session_state.campo_pergunta = st.text_area("📝 Pergunta:", value=st.session_state.pergunta_ativa, height=100)
+user_query = st.text_area("📝 Pergunta ao Perito:", placeholder="Analise a veracidade...", height=100)
 
-c1, c2 = st.columns([1,1])
+# 7. MOTOR PERICIAL CORRIGIDO (PDF base64 + retry melhor)
+c1, c2 = st.columns([1, 1])
 with c1:
     if st.button("🚀 EXECUTAR PERÍCIA"):
-        if not st.session_state.campo_pergunta.strip() and not st.session_state.arquivos_acumulados:
-            st.warning("Pergunta ou arquivo obrigatório.")
+        if not user_query and not st.session_state.arquivos_acumulados:
+            st.warning("Insira material.")
         else:
             tz = pytz.timezone("America/Sao_Paulo")
             agora = datetime.now(tz).strftime("%d/%m/%Y %H:%M")
-            with st.spinner("🔍 Auditoria..."):
+            with st.spinner("🕵️ Realizando auditoria segregada..."):
                 try:
                     tem_imagem = any(f["type"].startswith("image") for f in st.session_state.arquivos_acumulados)
-                    tem_pdf = any(".pdf" in f["name"].lower() for f in st.session_state.arquivos_acumulados)
-                    tem_email = any(".eml" in f["name"].lower() for f in st.session_state.arquivos_acumulados)
+                    tem_email = any(f["name"].lower().endswith(".eml") for f in st.session_state.arquivos_acumulados)
 
-                    instrucao = f"AuditIA sênior. {agora}. Inicie CLASSIFICACAO: [TIPO]. Técnico.\n"
-                    if tem_imagem: instrucao += "IMAGEM: mãos, olhos, luz, EXIF. Sem EXIF: ATENCAO (IA).\n"
-                    if tem_pdf: instrucao += "PDF: metadados, inconsistências, fraudes.\n"
-                    if tem_email: instrucao += "EML: SPF/DKIM/ARC/spoofing.\n"
-
-                    contexto = [instrucao, st.session_state.campo_pergunta]
-
-                    # Processar arquivos para contexto
+                    instrucao = f"Aja como AuditIA sênior. Hoje: {agora}. Regras: 1.Inicie CLASSIFICACAO: [TIPO]. 2.Seja técnico.\n"
+                    if tem_imagem:
+                        instrucao += "PROTOCOLO IMAGEM: mãos, olhos, luz, texturas. Sem EXIF: CLASSIFICACAO: ATENCAO (POSSIVEL IA).\n"
+                    if tem_email:
+                        instrucao += "PROTOCOLO E-MAIL: SPF, DKIM, ARC, spoofing.\n"
+                    
+                    contexto = [instrucao]
+                    
+                    # FIX PDF: base64 para multimodal correto
                     for f in st.session_state.arquivos_acumulados:
-                        nome = f["name"].lower()
-                        if f["type"].startswith("image"):
-                            contexto.append(Image.open(io.BytesIO(f["content"])))
-                        elif ".pdf" in nome:
-                            doc = fitz.open(stream=f["content"], filetype="pdf")
-                            texto_pdf = ""
-                            for page in doc: texto_pdf += page.get_text()
-                            contexto.append(f"PDF [{f['name']}]: {texto_pdf[:4000]}...")  # Limite token
-                        elif ".eml" in nome:
-                            msg = email.message_from_bytes(f["content"], policy=policy.default)
-                            texto_eml = msg.as_string()[:4000]
-                            contexto.append(f"EML RAW [{f['name']}]: {texto_eml}")
-
-                    # Retry robusto
+                        if f["name"].lower().endswith(".eml"):
+                            contexto.append(f"E-MAIL RAW: {f['content'].decode('utf-8', errors='ignore')[:2000]}")
+                        elif "pdf" in f["type"].lower() or ".pdf" in f["name"].lower():
+                            pdf_base64 = base64.b64encode(f["content"]).decode()
+                            contexto.append({
+                                "mime_type": "application/pdf", 
+                                "data": pdf_base64
+                            })
+                        elif f["type"].startswith("image"):
+                            contexto.append(Image.open(io.BytesIO(f["content"])).convert("RGB"))
+                    
+                    contexto.append(f"PERGUNTA: {user_query}")
+                    
+                    # RETRY MELHOR PARA 429 E TIMEOUT
                     for attempt in range(5):
                         try:
-                            res = model.generate_content(contexto, request_options={"timeout": 300})
+                            res = model.generate_content(
+                                contexto, 
+                                request_options={"timeout": 300.0}
+                            )
                             st.session_state.historico_pericial.append(res.text)
-                            st.session_state.pergunta_ativa = ""
                             st.rerun()
                             break
                         except Exception as e:
-                            if "429" in str(e).upper() or "quota" in str(e).lower():
-                                time.sleep(2 ** attempt)
+                            if "429" in str(e) or "quota" in str(e).lower():
+                                time.sleep(3 * (attempt + 1))
+                            elif "404" in str(e):
+                                st.error("Modelo indisponível. Use quota maior.")
                             else:
-                                st.error(f"Erro: {e}")
-                                break
-
-                except Exception as e:
-                    st.error(f"Falha: {e}")
+                                raise e
+                except Exception as e: 
+                    st.error(f"Falha técnica: {e}")
 
 with c2:
-    if st.button("🗑️ LIMPAR"):
+    if st.button("🗑️ LIMPAR CASO"):
         st.session_state.historico_pericial = []
         st.session_state.arquivos_acumulados = []
-        st.session_state.pergunta_ativa = ""
         st.rerun()
 
+# 8. CENTRAL DE AJUDA
 st.markdown("---")
-with st.expander("📖 Ajuda"):
-    st.markdown("- **Instale**: `pip install streamlit google-generativeai pymupdf`\n- 7 Pilares: Documental, IA Detect, e-Discovery, etc.")
+with st.expander("📖 Central de Ajuda AuditIA - Conhecimento Técnico"):
+    st.markdown("### 🧬 Os 7 Pilares\n1. Análise Documental. 2. Detecção de IA (12 marcadores). 3. e-Discovery. 4. Engenharia Social. 5. Física da Luz. 6. Ponzi Detection. 7. Consistência de Metadados.")
 
-st.caption(f"AuditIA © 2026 - Vargem Grande do Sul-SP | V2.3 Perfeita")
+st.caption(f"AuditIA © {datetime.now().year} - Vargem Grande do Sul - SP | Versão 2.2 FIX PDF/429")
